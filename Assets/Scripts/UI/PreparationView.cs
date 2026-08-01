@@ -50,27 +50,37 @@ namespace MonsterMart.UI
             BuildFooter(window.transform);
         }
 
+        // 版式常量集中在这里，改一处就能整体让位，避免文字互相重叠
+        const float HeaderHeight = 250f;   // 标题 + 简报 + 目标占用的高度
+        const float BoxHeight = 500f;      // 左右两栏的高度
+        const float RowHeight = 46f;       // 商品行高
+        const float RowSpacing = 3f;
+
         void BuildHeader(Transform window)
         {
-            _title = UIFactory.Label(window, "第 1 天 · 营业前准备", 40, UIFactory.Accent,
+            _title = UIFactory.Label(window, "第 1 天 · 营业前准备", 38, UIFactory.Accent,
                                      TextAnchor.MiddleLeft, "Title");
             UIFactory.Anchor(_title.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
-                             new Vector2(0, -52), new Vector2(-80, 50));
+                             new Vector2(0, -46), new Vector2(-80, 48));
 
-            _briefing = UIFactory.Label(window, "", 21, UIFactory.InkDim, TextAnchor.UpperLeft, "Briefing");
+            _briefing = UIFactory.Label(window, "", 19, UIFactory.InkDim, TextAnchor.UpperLeft, "Briefing");
+            _briefing.lineSpacing = 1.15f;
             UIFactory.Anchor(_briefing.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
-                             new Vector2(0, -140), new Vector2(-80, 110));
+                             new Vector2(0, -140), new Vector2(-80, 124));
 
-            _goalLabel = UIFactory.Label(window, "", 20, UIFactory.Warn, TextAnchor.UpperLeft, "Goal");
+            _goalLabel = UIFactory.Label(window, "", 19, UIFactory.Warn, TextAnchor.MiddleLeft, "Goal");
             UIFactory.Anchor(_goalLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
-                             new Vector2(0, -216), new Vector2(-80, 40));
+                             new Vector2(0, -222), new Vector2(-80, 34));
         }
+
+        /// <summary>左右两栏共用的垂直位置：正好压在 HeaderHeight 下面。</summary>
+        static float ColumnCenterY => 450f - HeaderHeight - 10f - BoxHeight * 0.5f;
 
         void BuildLeftColumn(Transform window)
         {
             var box = UIFactory.Panel(window, UIFactory.PanelBgSoft, "ProductBox");
             UIFactory.Anchor(box.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f),
-                             new Vector2(430, -40), new Vector2(820, 520));
+                             new Vector2(430, ColumnCenterY), new Vector2(820, BoxHeight));
 
             var header = UIFactory.Label(box.transform, "进货 · 商品列表", 24, UIFactory.Accent,
                                          TextAnchor.MiddleLeft, "Header");
@@ -81,7 +91,7 @@ namespace MonsterMart.UI
             UIFactory.Stretch(listRt, 16, 16, 16, 52);
 
             var group = listRt.gameObject.AddComponent<VerticalLayoutGroup>();
-            group.spacing = 4;
+            group.spacing = RowSpacing;
             group.childAlignment = TextAnchor.UpperLeft;
             group.childForceExpandWidth = true;
             group.childForceExpandHeight = false;
@@ -101,42 +111,42 @@ namespace MonsterMart.UI
                 var product = GameDatabase.Products[i];
 
                 var rowPanel = UIFactory.Panel(_productList, new Color(1f, 1f, 1f, 0.04f), "Row");
-                UIFactory.Size(rowPanel.gameObject, -1, 54, -1, 54);
+                UIFactory.Size(rowPanel.gameObject, -1, RowHeight, -1, RowHeight);
 
                 var hGroup = rowPanel.gameObject.AddComponent<HorizontalLayoutGroup>();
                 hGroup.spacing = 10;
-                hGroup.padding = new RectOffset(10, 10, 6, 6);
+                hGroup.padding = new RectOffset(10, 10, 4, 4);
                 hGroup.childAlignment = TextAnchor.MiddleLeft;
                 hGroup.childForceExpandWidth = false;
                 hGroup.childForceExpandHeight = true;
                 hGroup.childControlWidth = true;
                 hGroup.childControlHeight = true;
 
-                UIFactory.Icon(rowPanel.transform, SpriteFactory.ProductIcon(product), 36);
+                UIFactory.Icon(rowPanel.transform, SpriteFactory.ProductIcon(product), 32);
 
-                var name = UIFactory.Label(rowPanel.transform, product.displayName, 20, UIFactory.Ink,
+                var name = UIFactory.Label(rowPanel.transform, product.displayName, 19, UIFactory.Ink,
                                            TextAnchor.MiddleLeft, "Name");
-                UIFactory.Size(name.gameObject, 150, -1, 150, -1);
+                UIFactory.Size(name.gameObject, 140, -1, 140, -1);
 
                 var price = UIFactory.Label(rowPanel.transform,
-                    $"进 {product.purchasePrice} / 售 {product.salePrice}", 18, UIFactory.InkDim,
+                    $"进 {product.purchasePrice} / 售 {product.salePrice}", 17, UIFactory.InkDim,
                     TextAnchor.MiddleLeft, "Price");
-                UIFactory.Size(price.gameObject, 140, -1, 140, -1);
+                UIFactory.Size(price.gameObject, 130, -1, 130, -1);
 
-                var tag = UIFactory.Label(rowPanel.transform, PreferenceTag(product), 17,
+                var tag = UIFactory.Label(rowPanel.transform, PreferenceTag(product), 16,
                                           TagColor(product), TextAnchor.MiddleLeft, "Tag");
-                UIFactory.Size(tag.gameObject, 170, -1, 170, -1);
+                UIFactory.Size(tag.gameObject, 165, -1, 165, -1);
 
-                var stock = UIFactory.Label(rowPanel.transform, "仓库 0", 19, UIFactory.Warn,
+                var stock = UIFactory.Label(rowPanel.transform, "仓库 0", 18, UIFactory.Warn,
                                             TextAnchor.MiddleCenter, "Stock");
                 UIFactory.Size(stock.gameObject, 90, -1, 90, -1);
 
                 var captured = product;
                 var buy1 = UIFactory.Button(rowPanel.transform, "+1", () => Buy(captured, 1), 18);
-                UIFactory.Size(buy1.gameObject, 56, 36, 56, 36);
+                UIFactory.Size(buy1.gameObject, 54, 32, 54, 32);
 
                 var buy5 = UIFactory.Button(rowPanel.transform, "+5", () => Buy(captured, 5), 18);
-                UIFactory.Size(buy5.gameObject, 56, 36, 56, 36);
+                UIFactory.Size(buy5.gameObject, 54, 32, 54, 32);
 
                 _rows.Add(new ProductRow
                 {
@@ -176,7 +186,7 @@ namespace MonsterMart.UI
         {
             var box = UIFactory.Panel(window, UIFactory.PanelBgSoft, "PreviewBox");
             UIFactory.Anchor(box.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f),
-                             new Vector2(-330, -40), new Vector2(600, 520));
+                             new Vector2(-330, ColumnCenterY), new Vector2(600, BoxHeight));
 
             var header = UIFactory.Label(box.transform, "货架预览 · 预计库存", 24, UIFactory.Accent,
                                          TextAnchor.MiddleLeft, "Header");
@@ -199,10 +209,11 @@ namespace MonsterMart.UI
 
         void BuildFooter(Transform window)
         {
-            _moneyLabel = UIFactory.Label(window, "当前资金 0", 26, UIFactory.Warn,
+            // 两行显示，避免「当前资金 + 空仓库警告」挤成一行撞到右边的按钮
+            _moneyLabel = UIFactory.Label(window, "当前资金 0", 21, UIFactory.Warn,
                                           TextAnchor.MiddleLeft, "Money");
             UIFactory.Anchor(_moneyLabel.rectTransform, new Vector2(0, 0), new Vector2(0, 0),
-                             new Vector2(200, 62), new Vector2(340, 36));
+                             new Vector2(240, 66), new Vector2(400, 62));
 
             var start = UIFactory.Button(window, "开始营业", TryBeginBusiness,
                                          26, new Color(0.30f, 0.52f, 0.34f));
@@ -311,8 +322,8 @@ namespace MonsterMart.UI
                 totalStock += Game.Store.WarehouseCount(GameDatabase.Products[i]);
 
             _moneyLabel.text = totalStock > 0
-                ? $"当前资金 {Game.Economy.Money}　·　仓库共 {totalStock} 件"
-                : $"当前资金 {Game.Economy.Money}　·　<color=#F26B61>仓库是空的，先买点货</color>";
+                ? $"当前资金 {Game.Economy.Money}\n<size=18>仓库共 {totalStock} 件</size>"
+                : $"当前资金 {Game.Economy.Money}\n<size=18><color=#F26B61>仓库是空的，先买点货</color></size>";
 
             for (int i = 0; i < _rows.Count; i++)
             {
