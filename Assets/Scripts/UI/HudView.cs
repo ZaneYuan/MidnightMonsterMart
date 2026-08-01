@@ -153,7 +153,7 @@ namespace MonsterMart.UI
                              new Vector2(40, 16), new Vector2(700, 32));
 
             _hintLabel = UIFactory.Label(box.transform,
-                "WASD 移动 · Shift 加速 · E 交互 · Tab 图鉴 · Esc 暂停",
+                "WASD 移动 · 双击方向键 加速 · 长按 E 交互 · Tab 图鉴 · Esc 暂停",
                 17, new Color(0.55f, 0.55f, 0.66f), TextAnchor.MiddleCenter, "Hint");
             UIFactory.Anchor(_hintLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                              new Vector2(40, -22), new Vector2(700, 24));

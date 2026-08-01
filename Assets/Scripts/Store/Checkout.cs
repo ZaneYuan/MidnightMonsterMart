@@ -12,10 +12,8 @@ namespace MonsterMart.Store
     /// 收银台 — 设计文档 §5。
     /// 负责排队点管理、收银会话的开启，扫描玩法本身在 CheckoutView 里。
     /// </summary>
-    public class Checkout : Interactable
+    public class Checkout : FixtureInteractable
     {
-        public CellRect cells;
-
         /// <summary>收银台等级：0 = 初级，1 = 升级（文档 §5.2）。</summary>
         public int Level { get; private set; }
 
@@ -70,8 +68,6 @@ namespace MonsterMart.Store
                     ? new Vector3(1.5f, 1.5f, 1f)
                     : Vector3.one;
         }
-
-        public override Vector2 InteractAnchor => cells.CenterWorld;
 
         // ------------------------------------------------------------------
         // 排队 — 设计文档 §9.3「收银台前设置 3 个排队点」

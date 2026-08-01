@@ -55,6 +55,7 @@ namespace MonsterMart.Core
             InteractableRegistry.Clear();
             CustomerRegistry.Clear();
             BestiaryTracker.Reset();
+            InputReader.Reset();
 
             var root = new GameObject("Runtime");
             root.transform.SetParent(transform, false);

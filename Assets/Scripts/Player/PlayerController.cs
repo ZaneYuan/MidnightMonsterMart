@@ -71,6 +71,9 @@ namespace MonsterMart.Player
         {
             if (Game.Manager == null) return;
 
+            // 双击加速的状态机每帧都要推进，站着不动时才能正确解除加速
+            InputReader.Tick();
+
             bool canAct = Game.Manager.State == GameState.Open ||
                           Game.Manager.State == GameState.Preparation;
 

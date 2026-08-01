@@ -11,13 +11,12 @@ namespace MonsterMart.Store
     /// 货架 / 冰柜 / 工具架 — 设计文档 §3.3。
     /// 每个货架绑定一种商品（文档「货架拥有：商品类型」）。
     /// </summary>
-    public class Shelf : Interactable
+    public class Shelf : FixtureInteractable
     {
         public ProductData product;
         public int count;
         public int capacity = GameConfig.ShelfCapacity;
         public FixtureKind kind = FixtureKind.Shelf;
-        public CellRect cells;
         public string displayName;
 
         /// <summary>被狼人撞倒 — 设计文档 §7 事件二。</summary>
@@ -34,8 +33,6 @@ namespace MonsterMart.Store
         public bool IsEmpty => count <= 0;
         public bool IsFull => count >= capacity;
         public bool Usable => !knockedOver && !IsEmpty;
-
-        public override Vector2 InteractAnchor => cells.CenterWorld;
 
         public void Configure(ProductData assignedProduct, FixtureKind fixtureKind, CellRect rect, string label)
         {

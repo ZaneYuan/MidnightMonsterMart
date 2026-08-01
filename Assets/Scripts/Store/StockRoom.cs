@@ -10,10 +10,8 @@ namespace MonsterMart.Store
     /// 仓库门 — 设计文档 §3.3 的补货流程起点。
     /// 玩家靠近 → 选择商品 → 携带（一次只带一种，上限 5 件）。
     /// </summary>
-    public class StockRoom : Interactable
+    public class StockRoom : FixtureInteractable
     {
-        public CellRect cells;
-
         public void Configure(CellRect rect)
         {
             cells = rect;
@@ -35,8 +33,6 @@ namespace MonsterMart.Store
             signSr.transform.localScale = new Vector3(0.7f, 0.25f, 1f);
             signSr.transform.localPosition = new Vector3(0f, -cells.HeightCells * 0.5f + 0.2f, 0f);
         }
-
-        public override Vector2 InteractAnchor => cells.CenterWorld;
 
         public override bool IsAvailable(PlayerController player)
         {

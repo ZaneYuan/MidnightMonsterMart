@@ -159,6 +159,29 @@ namespace MonsterMart.Core
 
         public Vector2 SizeWorld => new Vector2(WidthCells, HeightCells);
 
+        /// <summary>矩形在世界坐标下的范围（格 x 覆盖 [x, x+1)）。</summary>
+        public float MinXWorld => xMin;
+        public float MaxXWorld => xMax + 1f;
+        public float MinYWorld => yMin;
+        public float MaxYWorld => yMax + 1f;
+
+        /// <summary>矩形上离给定点最近的位置。</summary>
+        public Vector2 NearestPointWorld(Vector2 p) => new Vector2(
+            Mathf.Clamp(p.x, MinXWorld, MaxXWorld),
+            Mathf.Clamp(p.y, MinYWorld, MaxYWorld));
+
+        /// <summary>
+        /// 点到矩形边缘的距离（点在矩形内时为 0）。
+        /// 交互判定用这个而不是到中心的距离 —— 否则 3 格宽的货架
+        /// 只有站在正中间那格才够得着。
+        /// </summary>
+        public float DistanceToWorld(Vector2 p)
+        {
+            float dx = Mathf.Max(0f, Mathf.Max(MinXWorld - p.x, p.x - MaxXWorld));
+            float dy = Mathf.Max(0f, Mathf.Max(MinYWorld - p.y, p.y - MaxYWorld));
+            return Mathf.Sqrt(dx * dx + dy * dy);
+        }
+
         public bool Contains(Vector2Int c)
             => c.x >= xMin && c.x <= xMax && c.y >= yMin && c.y <= yMax;
 

@@ -52,12 +52,11 @@ namespace MonsterMart.Store
     /// 装饰镜 — 设计文档 §4.1「吸血鬼靠近镜子时会持续降低耐心」。
     /// 营业前可以：保留 / 遮住 / 移走，形成一个明确的取舍。
     /// </summary>
-    public class Mirror : Interactable
+    public class Mirror : FixtureInteractable
     {
         public enum MirrorState { Exposed, Covered, Removed }
 
         public MirrorState State { get; private set; } = MirrorState.Exposed;
-        public CellRect cells;
 
         SpriteRenderer _renderer;
 
@@ -78,8 +77,6 @@ namespace MonsterMart.Store
             _renderer.sortingOrder = SortingLayers.Fixture;
             ApplyVisual();
         }
-
-        public override Vector2 InteractAnchor => cells.CenterWorld;
 
         void ApplyVisual()
         {
@@ -131,10 +128,8 @@ namespace MonsterMart.Store
     }
 
     /// <summary>垃圾桶 — 丢弃手上拿错的商品（按进货价的一半折损）。</summary>
-    public class TrashBin : Interactable
+    public class TrashBin : FixtureInteractable
     {
-        public CellRect cells;
-
         public void Configure(CellRect rect)
         {
             cells = rect;
@@ -148,8 +143,6 @@ namespace MonsterMart.Store
                                             rect.WidthCells, rect.HeightCells);
             sr.sortingOrder = SortingLayers.Fixture;
         }
-
-        public override Vector2 InteractAnchor => cells.CenterWorld;
 
         public override bool IsAvailable(PlayerController player)
             => player != null && !player.Carry.IsEmpty;
@@ -170,10 +163,8 @@ namespace MonsterMart.Store
     /// 灵界包装台 — 设计文档 §4.3。
     /// 幽灵拿不到实体商品，玩家必须替它取货 → 放到这里处理 → 再交给它。
     /// </summary>
-    public class SpiritPackingStation : Interactable
+    public class SpiritPackingStation : FixtureInteractable
     {
-        public CellRect cells;
-
         /// <summary>已处理完、等待交付的商品。</summary>
         public ProductData PackedProduct { get; private set; }
 
@@ -199,8 +190,6 @@ namespace MonsterMart.Store
             _glow.sortingOrder = SortingLayers.FixtureOverlay;
             _glow.enabled = false;
         }
-
-        public override Vector2 InteractAnchor => cells.CenterWorld;
 
         public bool HasPacked => PackedProduct != null;
 

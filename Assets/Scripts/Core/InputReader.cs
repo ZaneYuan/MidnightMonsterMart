@@ -27,9 +27,72 @@ namespace MonsterMart.Core
             }
         }
 
-        /// <summary>Shift：加速移动。</summary>
-        public static bool Sprint =>
-            Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        // ------------------------------------------------------------------
+        // 加速：双击方向键
+        // ------------------------------------------------------------------
+        const float DoubleTapWindow = 0.28f;
+
+        static readonly KeyCode[][] DirectionKeys =
+        {
+            new[] { KeyCode.W, KeyCode.UpArrow },
+            new[] { KeyCode.S, KeyCode.DownArrow },
+            new[] { KeyCode.A, KeyCode.LeftArrow },
+            new[] { KeyCode.D, KeyCode.RightArrow },
+        };
+
+        static readonly float[] _lastTapTime = { -10f, -10f, -10f, -10f };
+        static bool _sprintLatched;
+        static int _evaluatedFrame = -1;
+
+        /// <summary>
+        /// 加速状态。双击任一方向键进入，松开所有方向键后退出
+        /// （想再加速需要重新双击）。
+        /// </summary>
+        public static bool Sprint
+        {
+            get
+            {
+                Tick();
+                return _sprintLatched;
+            }
+        }
+
+        /// <summary>每帧调用一次，即使玩家没在移动也要调，否则加速状态不会解除。</summary>
+        public static void Tick()
+        {
+            if (_evaluatedFrame == Time.frameCount) return;
+            _evaluatedFrame = Time.frameCount;
+
+            // 停下来就取消加速
+            if (MoveAxis.sqrMagnitude < 0.0001f)
+            {
+                _sprintLatched = false;
+                return;
+            }
+
+            for (int dir = 0; dir < DirectionKeys.Length; dir++)
+            {
+                if (!AnyKeyDown(DirectionKeys[dir])) continue;
+
+                if (Time.time - _lastTapTime[dir] <= DoubleTapWindow) _sprintLatched = true;
+                _lastTapTime[dir] = Time.time;
+            }
+        }
+
+        static bool AnyKeyDown(KeyCode[] keys)
+        {
+            for (int i = 0; i < keys.Length; i++)
+                if (Input.GetKeyDown(keys[i])) return true;
+            return false;
+        }
+
+        /// <summary>重开一局时清掉残留状态。</summary>
+        public static void Reset()
+        {
+            _sprintLatched = false;
+            _evaluatedFrame = -1;
+            for (int i = 0; i < _lastTapTime.Length; i++) _lastTapTime[i] = -10f;
+        }
 
         /// <summary>E：交互（按下瞬间）。</summary>
         public static bool InteractPressed => Input.GetKeyDown(KeyCode.E);

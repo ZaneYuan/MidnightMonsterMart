@@ -30,7 +30,7 @@ namespace MonsterMart.Store
         public static Interactable FindNearest(PlayerController player, Vector2 origin, float range)
         {
             Interactable best = null;
-            float bestSqr = range * range;
+            float bestDistance = range;
 
             for (int i = 0; i < _all.Count; i++)
             {
@@ -38,14 +38,12 @@ namespace MonsterMart.Store
                 if (candidate == null || !candidate.isActiveAndEnabled) continue;
                 if (!candidate.IsAvailable(player)) continue;
 
-                Vector2 anchor = candidate.InteractAnchor;
-                float dx = anchor.x - origin.x;
-                float dy = anchor.y - origin.y;
-                float sqr = dx * dx + dy * dy;
+                // 多格设施用「到矩形边缘的距离」，站在任意一边都算贴着
+                float distance = candidate.DistanceTo(origin);
 
-                if (sqr <= bestSqr)
+                if (distance <= bestDistance)
                 {
-                    bestSqr = sqr;
+                    bestDistance = distance;
                     best = candidate;
                 }
             }
