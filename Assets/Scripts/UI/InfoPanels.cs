@@ -72,13 +72,15 @@ namespace MonsterMart.UI
 
             _numbers.text =
                 "<b>收支</b>\n" +
-                $"销售收入　　{s.salesRevenue}\n" +
-                $"进货成本　　-{s.purchaseCost}\n" +
-                $"商品损耗　　-{s.spoilage}\n" +
-                $"维修支出　　-{s.repairCost}\n" +
-                $"<b>当日利润　　{s.profit}</b>\n\n" +
-                $"店铺声望　　{s.reputationBefore} → {s.reputationAfter}\n" +
-                $"整洁度　　　{Mathf.RoundToInt(s.cleanliness)}";
+                $"销售收入　　　{s.salesRevenue}\n" +
+                $"已售商品成本　-{s.costOfGoodsSold}\n" +
+                $"商品损耗　　　-{s.spoilage}\n" +
+                $"维修支出　　　-{s.repairCost}\n" +
+                $"<b>当日利润　　　{s.profit}</b>\n\n" +
+                $"<size=17><color=#9A9AAE>今晚进货花了 {s.purchaseCost}，没卖掉的算库存，\n" +
+                "明天还能继续卖，不计入当日利润。</color></size>\n\n" +
+                $"店铺声望　　　{s.reputationBefore} → {s.reputationAfter}\n" +
+                $"整洁度　　　　{Mathf.RoundToInt(s.cleanliness)}";
 
             _customers.text =
                 "<b>顾客</b>\n" +

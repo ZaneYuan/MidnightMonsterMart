@@ -11,14 +11,27 @@ namespace MonsterMart.Core
         public int Money { get; private set; }
 
         public int DaySalesRevenue { get; private set; }
+
+        /// <summary>当天花在进货上的现金（含没卖掉的库存）。</summary>
         public int DayPurchaseCost { get; private set; }
+
+        /// <summary>已售出商品的进货成本（COGS）。</summary>
+        public int DayCostOfGoodsSold { get; private set; }
+
         public int DaySpoilage { get; private set; }
         public int DayRepairCost { get; private set; }
 
         public event Action OnChanged;
 
-        /// <summary>当日利润 = 销售收入 - 进货成本 - 商品损耗 - 维修支出。</summary>
-        public int DayProfit => DaySalesRevenue - DayPurchaseCost - DaySpoilage - DayRepairCost;
+        /// <summary>
+        /// 当日利润 = 销售收入 - 已售商品成本 - 商品损耗 - 维修支出。
+        ///
+        /// 设计文档 §6.1 写的是「进货成本」，这里取其会计含义 —— 已售商品成本。
+        /// 若按当天进货总额扣，玩家备货越充分利润越低（多进的货第二天还能卖），
+        /// 第一天更是必然亏损，教学目标「利润 > 0」根本无法达成。
+        /// 进货现金流单独显示在结算界面。
+        /// </summary>
+        public int DayProfit => DaySalesRevenue - DayCostOfGoodsSold - DaySpoilage - DayRepairCost;
 
         public void Initialize(int startingMoney)
         {
@@ -30,6 +43,7 @@ namespace MonsterMart.Core
         {
             DaySalesRevenue = 0;
             DayPurchaseCost = 0;
+            DayCostOfGoodsSold = 0;
             DaySpoilage = 0;
             DayRepairCost = 0;
             OnChanged?.Invoke();
@@ -55,6 +69,14 @@ namespace MonsterMart.Core
             if (revenue <= 0) return;
             Money += revenue;
             DaySalesRevenue += revenue;
+            OnChanged?.Invoke();
+        }
+
+        /// <summary>登记本次交易中离店商品的进货成本。不影响现金（进货时已付过）。</summary>
+        public void RecordCostOfGoodsSold(int cost)
+        {
+            if (cost <= 0) return;
+            DayCostOfGoodsSold += cost;
             OnChanged?.Invoke();
         }
 

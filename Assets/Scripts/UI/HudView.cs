@@ -69,10 +69,15 @@ namespace MonsterMart.UI
             _prepBar = box.rectTransform;
 
             _prepHint = UIFactory.Label(box.transform,
-                "营业前准备：去仓库拿货，走到对应货架前长按 E 摆上去。没有时间限制。",
-                20, UIFactory.Ink, TextAnchor.MiddleLeft, "Hint");
+                "营业前准备：没有时间限制，顾客还不会来。",
+                19, UIFactory.Ink, TextAnchor.MiddleLeft, "Hint");
             UIFactory.Anchor(_prepHint.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f),
-                             new Vector2(268, 0), new Vector2(500, 60));
+                             new Vector2(230, 0), new Vector2(420, 62));
+
+            var auto = UIFactory.Button(box.transform, "一键摆货",
+                () => Game.UI.Preparation.AutoStock(), 20, new Color(0.32f, 0.44f, 0.30f));
+            UIFactory.Anchor(auto.GetComponent<RectTransform>(), new Vector2(1, 0.5f), new Vector2(1, 0.5f),
+                             new Vector2(-470, 0), new Vector2(170, 56));
 
             var buy = UIFactory.Button(box.transform, "进货界面 (B)",
                 () => Game.UI.ShowPreparation(), 20);
@@ -223,8 +228,8 @@ namespace MonsterMart.UI
 
             int empty = Game.Store != null ? Game.Store.EmptyShelfCount() : 0;
             _prepHint.text = empty > 0
-                ? $"营业前准备 · 还有 <color=#F26B61>{empty}</color> 个货架是空的（红标）\n去仓库拿货 → 走到对应货架前<b>长按 E</b>。没有时间限制。"
-                : "营业前准备 · 所有货架都有货了，可以开门了。";
+                ? $"营业前准备 · 还有 <color=#F26B61>{empty}</color> 个货架空着（红标）\n没有时间限制，顾客还不会来。"
+                : "营业前准备 · 货架都有货了，可以开门。";
         }
 
         void UpdateStats()

@@ -11,6 +11,7 @@ namespace MonsterMart.Core
         public int day;
         public int salesRevenue;
         public int purchaseCost;
+        public int costOfGoodsSold;
         public int spoilage;
         public int repairCost;
         public int profit;
@@ -122,6 +123,7 @@ namespace MonsterMart.Core
                 day = CurrentDay,
                 salesRevenue = eco != null ? eco.DaySalesRevenue : 0,
                 purchaseCost = eco != null ? eco.DayPurchaseCost : 0,
+                costOfGoodsSold = eco != null ? eco.DayCostOfGoodsSold : 0,
                 spoilage = eco != null ? eco.DaySpoilage : 0,
                 repairCost = eco != null ? eco.DayRepairCost : 0,
                 profit = eco != null ? eco.DayProfit : 0,

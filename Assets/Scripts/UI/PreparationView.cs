@@ -18,11 +18,16 @@ namespace MonsterMart.UI
         Text _moneyLabel;
         Transform _productList;
         Transform _shelfPreview;
+        Transform _crowdList;
+        Text _crowdSummary;
         Button _upgradeButton;
         Text _upgradeLabel;
+        Button _autoStockButton;
+        Text _autoStockLabel;
 
         readonly List<ProductRow> _rows = new List<ProductRow>();
         readonly List<Text> _previewRows = new List<Text>();
+        readonly List<Text> _crowdRows = new List<Text>();
 
         class ProductRow
         {
@@ -85,6 +90,12 @@ namespace MonsterMart.UI
             var header = UIFactory.Label(box.transform, "进货 · 商品列表", 24, UIFactory.Accent,
                                          TextAnchor.MiddleLeft, "Header");
             UIFactory.Anchor(header.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
+                             new Vector2(0, -26), new Vector2(-32, 32));
+
+            // 资金放在这一行的右端，把底部整行让给按钮
+            _moneyLabel = UIFactory.Label(box.transform, "", 21, UIFactory.Warn,
+                                          TextAnchor.MiddleRight, "Money");
+            UIFactory.Anchor(_moneyLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
                              new Vector2(0, -26), new Vector2(-32, 32));
 
             var listRt = UIFactory.NewRect("List", box.transform);
@@ -188,16 +199,40 @@ namespace MonsterMart.UI
             UIFactory.Anchor(box.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f),
                              new Vector2(-330, ColumnCenterY), new Vector2(600, BoxHeight));
 
-            var header = UIFactory.Label(box.transform, "货架预览 · 预计库存", 24, UIFactory.Accent,
+            // ---- 今晚客流（设计文档 §2.1「查看当天可能出现的顾客类型」）----
+            var crowdHeader = UIFactory.Label(box.transform, "今晚客流", 23, UIFactory.Accent,
+                                              TextAnchor.MiddleLeft, "CrowdHeader");
+            UIFactory.Anchor(crowdHeader.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
+                             new Vector2(0, -26), new Vector2(-32, 30));
+
+            var crowdRt = UIFactory.NewRect("CrowdList", box.transform);
+            UIFactory.Stretch(crowdRt, 16, BoxHeight - 212f, 16, 46);
+
+            var crowdGroup = crowdRt.gameObject.AddComponent<VerticalLayoutGroup>();
+            crowdGroup.spacing = 2;
+            crowdGroup.childAlignment = TextAnchor.UpperLeft;
+            crowdGroup.childForceExpandWidth = true;
+            crowdGroup.childForceExpandHeight = false;
+            crowdGroup.childControlWidth = true;
+            crowdGroup.childControlHeight = true;
+            _crowdList = crowdRt;
+
+            _crowdSummary = UIFactory.Label(box.transform, "", 16, UIFactory.Warn,
+                                            TextAnchor.MiddleLeft, "CrowdSummary");
+            UIFactory.Anchor(_crowdSummary.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
+                             new Vector2(0, -228), new Vector2(-32, 26));
+
+            // ---- 货架预览 ----
+            var header = UIFactory.Label(box.transform, "货架预览 · 预计库存", 23, UIFactory.Accent,
                                          TextAnchor.MiddleLeft, "Header");
             UIFactory.Anchor(header.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
-                             new Vector2(0, -26), new Vector2(-32, 32));
+                             new Vector2(0, -258), new Vector2(-32, 28));
 
             var listRt = UIFactory.NewRect("List", box.transform);
-            UIFactory.Stretch(listRt, 16, 16, 16, 52);
+            UIFactory.Stretch(listRt, 16, 16, 16, 276);
 
             var group = listRt.gameObject.AddComponent<VerticalLayoutGroup>();
-            group.spacing = 4;
+            group.spacing = 2;
             group.childAlignment = TextAnchor.UpperLeft;
             group.childForceExpandWidth = true;
             group.childForceExpandHeight = false;
@@ -207,35 +242,104 @@ namespace MonsterMart.UI
             _shelfPreview = listRt;
         }
 
+        /// <summary>按当天的波次表统计各类怪物数量，并列出它们的偏好与禁忌。</summary>
+        void RefreshCrowd(DayPlan plan)
+        {
+            var counts = new Dictionary<MonsterType, int>();
+            var order = new List<MonsterType>();
+
+            if (plan != null)
+            {
+                for (int i = 0; i < plan.spawns.Count; i++)
+                {
+                    var type = plan.spawns[i].monsterType;
+                    if (!counts.ContainsKey(type))
+                    {
+                        counts[type] = 0;
+                        order.Add(type);
+                    }
+                    counts[type]++;
+                }
+            }
+
+            while (_crowdRows.Count < order.Count)
+            {
+                var label = UIFactory.Label(_crowdList, "", 16, UIFactory.Ink,
+                                            TextAnchor.MiddleLeft, "CrowdRow");
+                UIFactory.Size(label.gameObject, -1, 30, -1, 30);
+                _crowdRows.Add(label);
+            }
+
+            for (int i = 0; i < _crowdRows.Count; i++)
+            {
+                if (i >= order.Count)
+                {
+                    _crowdRows[i].text = "";
+                    continue;
+                }
+
+                var type = order[i];
+                var data = GameDatabase.GetCustomer(type);
+                if (data == null) { _crowdRows[i].text = ""; continue; }
+
+                if (type == MonsterType.Inspector)
+                {
+                    _crowdRows[i].text =
+                        $"<b>{data.displayName}</b> ×{counts[type]}　" +
+                        "<color=#AAAABB>检查缺货 / 整洁 / 禁忌商品 / 满意度</color>";
+                    continue;
+                }
+
+                _crowdRows[i].text =
+                    $"<b>{data.displayName}</b> ×{counts[type]}　" +
+                    $"<color=#7CE07C>要买 {JoinNames(GameDatabase.PreferredProducts(type))}</color>　" +
+                    $"<color=#F26B61>忌 {JoinNames(GameDatabase.DislikedProducts(type))}</color>";
+            }
+
+            int total = plan != null ? plan.TotalCustomers : 0;
+            int perHead = plan != null ? plan.maxItemsPerCustomer : 0;
+            _crowdSummary.text = $"共 {total} 位客人，每人最多买 {perHead} 件 —— 备货够卖就行，多进的算库存。";
+        }
+
+        static string JoinNames(List<ProductData> products)
+        {
+            if (products == null || products.Count == 0) return "—";
+
+            var parts = new string[products.Count];
+            for (int i = 0; i < products.Count; i++) parts[i] = products[i].displayName;
+            return string.Join("、", parts);
+        }
+
         void BuildFooter(Transform window)
         {
-            // 两行显示，避免「当前资金 + 空仓库警告」挤成一行撞到右边的按钮
-            _moneyLabel = UIFactory.Label(window, "当前资金 0", 21, UIFactory.Warn,
-                                          TextAnchor.MiddleLeft, "Money");
-            UIFactory.Anchor(_moneyLabel.rectTransform, new Vector2(0, 0), new Vector2(0, 0),
-                             new Vector2(240, 66), new Vector2(400, 62));
-
             var start = UIFactory.Button(window, "开始营业", TryBeginBusiness,
-                                         26, new Color(0.30f, 0.52f, 0.34f));
+                                         25, new Color(0.30f, 0.52f, 0.34f));
             UIFactory.Anchor(start.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
-                             new Vector2(-160, 62), new Vector2(240, 56));
+                             new Vector2(-150, 62), new Vector2(220, 56));
 
-            // 关掉面板去店里摆货 —— 准备阶段没有时间限制（设计文档 §2.1）
-            var stock = UIFactory.Button(window, "先去店里摆货", Close, 22,
+            // 一键摆货：准备阶段没有时间压力，来回搬运只是重复劳动
+            _autoStockButton = UIFactory.Button(window, "一键摆货", AutoStock, 22,
+                                                new Color(0.32f, 0.44f, 0.30f));
+            UIFactory.Anchor(_autoStockButton.GetComponent<RectTransform>(),
+                             new Vector2(1, 0), new Vector2(1, 0),
+                             new Vector2(-400, 62), new Vector2(250, 56));
+            _autoStockLabel = _autoStockButton.GetComponentInChildren<Text>();
+
+            var stock = UIFactory.Button(window, "自己去店里摆", Close, 21,
                                          new Color(0.28f, 0.38f, 0.55f));
             UIFactory.Anchor(stock.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
-                             new Vector2(-420, 62), new Vector2(240, 56));
+                             new Vector2(-670, 62), new Vector2(250, 56));
 
             var bestiary = UIFactory.Button(window, "图鉴 (Tab)", () =>
             {
                 Game.UI.ToggleBestiary();
             }, 20);
             UIFactory.Anchor(bestiary.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
-                             new Vector2(-640, 62), new Vector2(170, 56));
+                             new Vector2(-905, 62), new Vector2(180, 56));
 
             _upgradeButton = UIFactory.Button(window, "", UpgradeCheckout, 20);
             UIFactory.Anchor(_upgradeButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
-                             new Vector2(-880, 62), new Vector2(280, 56));
+                             new Vector2(-1165, 62), new Vector2(300, 56));
             _upgradeLabel = _upgradeButton.GetComponentInChildren<Text>();
         }
 
@@ -251,6 +355,7 @@ namespace MonsterMart.UI
                 _goalLabel.text = "今晚目标：" + plan.goalDescription;
             }
 
+            RefreshCrowd(plan);
             RefreshAll();
         }
 
@@ -264,7 +369,7 @@ namespace MonsterMart.UI
             for (int i = 0; i < GameDatabase.Products.Count; i++)
                 totalStock += Game.Store.WarehouseCount(GameDatabase.Products[i]);
 
-            bool shelvesEmpty = Game.Store.EmptyShelfCount() >= Game.Store.Shelves.Count;
+            bool shelvesEmpty = Game.Store.EmptyShelfCount() >= Game.Store.SalesShelfCount();
 
             if (totalStock <= 0 && shelvesEmpty)
             {
@@ -297,6 +402,25 @@ namespace MonsterMart.UI
             RefreshAll();
         }
 
+        /// <summary>把仓库里的货一次性铺到对应货架上。</summary>
+        public void AutoStock()
+        {
+            int placed = Game.Store.AutoRestockAll();
+
+            if (placed <= 0)
+            {
+                Game.UI.Hud.Flash("没有可以上架的货了（仓库空了，或货架已满）");
+                Game.Audio?.PlayError();
+            }
+            else
+            {
+                Game.UI.Hud.Flash($"已上架 {placed} 件");
+                Game.Audio?.PlayRestock();
+            }
+
+            RefreshAll();
+        }
+
         void UpgradeCheckout()
         {
             var checkout = Game.Store.Checkout;
@@ -322,8 +446,14 @@ namespace MonsterMart.UI
                 totalStock += Game.Store.WarehouseCount(GameDatabase.Products[i]);
 
             _moneyLabel.text = totalStock > 0
-                ? $"当前资金 {Game.Economy.Money}\n<size=18>仓库共 {totalStock} 件</size>"
-                : $"当前资金 {Game.Economy.Money}\n<size=18><color=#F26B61>仓库是空的，先买点货</color></size>";
+                ? $"资金 {Game.Economy.Money}　·　仓库 {totalStock} 件"
+                : $"资金 {Game.Economy.Money}　·　<color=#F26B61>仓库是空的</color>";
+
+            if (_autoStockLabel != null)
+            {
+                _autoStockLabel.text = totalStock > 0 ? $"一键摆货（{totalStock} 件）" : "一键摆货";
+                _autoStockButton.interactable = totalStock > 0;
+            }
 
             for (int i = 0; i < _rows.Count; i++)
             {
@@ -347,9 +477,9 @@ namespace MonsterMart.UI
 
             while (_previewRows.Count < shelves.Count)
             {
-                var label = UIFactory.Label(_shelfPreview, "", 19, UIFactory.Ink,
+                var label = UIFactory.Label(_shelfPreview, "", 15, UIFactory.Ink,
                                             TextAnchor.MiddleLeft, "PreviewRow");
-                UIFactory.Size(label.gameObject, -1, 30, -1, 30);
+                UIFactory.Size(label.gameObject, -1, 24, -1, 24);
                 _previewRows.Add(label);
             }
 
@@ -365,8 +495,17 @@ namespace MonsterMart.UI
                 int warehouse = Game.Store.WarehouseCount(shelf.product);
                 int projected = Mathf.Min(shelf.capacity, shelf.count + warehouse);
 
+                if (shelf.isSupplyRack)
+                {
+                    // 清洁用品架不卖货，缺了也不算事故
+                    _previewRows[i].text =
+                        $"{shelf.displayName}　{shelf.product.displayName}　架上 {shelf.count}　→ 可补到 {projected}　<color=#8FA8C8>（自用）</color>";
+                    _previewRows[i].color = UIFactory.InkDim;
+                    continue;
+                }
+
                 _previewRows[i].text =
-                    $"{shelf.displayName}　{shelf.product.displayName}　货架 {shelf.count}/{shelf.capacity}　→ 可补到 {projected}";
+                    $"{shelf.displayName}　{shelf.product.displayName}　{shelf.count}/{shelf.capacity}　→ 可补到 {projected}";
 
                 _previewRows[i].color = projected <= 0 ? UIFactory.Bad
                                       : projected < shelf.capacity / 2 ? UIFactory.Warn

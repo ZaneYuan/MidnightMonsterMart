@@ -478,13 +478,14 @@ namespace MonsterMart.Customers
             Behaviour?.OnCheckout(this);
         }
 
-        /// <summary>结账成功。</summary>
-        public void CompleteCheckout(int revenue, float satisfactionDelta)
+        /// <summary>结账成功。costOfGoods 是离店商品的进货成本。</summary>
+        public void CompleteCheckout(int revenue, int costOfGoods, float satisfactionDelta)
         {
             Served = true;
             AddSatisfaction(satisfactionDelta);
 
             Game.Economy?.RecordSale(revenue);
+            Game.Economy?.RecordCostOfGoodsSold(costOfGoods);
             Game.Store.Checkout.Dequeue(this);
 
             int repDelta = Satisfaction >= 70f

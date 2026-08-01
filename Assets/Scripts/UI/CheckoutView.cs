@@ -28,6 +28,7 @@ namespace MonsterMart.UI
         Image _patienceBar;
         RectTransform _counter;
         RectTransform _scanZone;
+        RectTransform _dragLayer;
         Image _scanGlow;
         Button _finishButton;
 
@@ -110,6 +111,12 @@ namespace MonsterMart.UI
                                              new Color(0.30f, 0.52f, 0.34f));
             UIFactory.Anchor(_finishButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-160, 44), new Vector2(240, 52));
+
+            // 拖拽层：必须是窗口的最后一个子节点，否则被拖起来的商品
+            // 会被后创建的扫描区盖住（SetAsLastSibling 只在同一父节点内生效）
+            _dragLayer = UIFactory.NewRect("DragLayer", window.transform);
+            UIFactory.Stretch(_dragLayer);
+            _dragLayer.SetAsLastSibling();
         }
 
         // ------------------------------------------------------------------
@@ -161,7 +168,7 @@ namespace MonsterMart.UI
                              new Vector2(0, 26), new Vector2(116, 46));
 
             var drag = holder.gameObject.AddComponent<DraggableItem>();
-            drag.Setup(this, holder.rectTransform);
+            drag.Setup(this, holder.rectTransform, _counter, _dragLayer);
 
             var item = new ScanItem
             {
@@ -436,9 +443,15 @@ namespace MonsterMart.UI
             int revenue = bonusRevenue;
             int missed = 0;
 
+            // 只要商品离开了货架就产生成本 —— 漏扫等于把货白送出去，
+            // 所以漏扫的那份成本照样计入，收入却是 0。
+            int costOfGoods = 0;
+
             for (int i = 0; i < _items.Count; i++)
             {
-                if (_items[i].swallowed) continue;   // 吞下的部分已在弹窗里结算
+                costOfGoods += _items[i].product.purchasePrice;
+
+                if (_items[i].swallowed) continue;   // 吞下的部分已在弹窗里结算收入
 
                 if (_items[i].scanned) revenue += _items[i].product.salePrice;
                 else missed++;
@@ -463,7 +476,7 @@ namespace MonsterMart.UI
             _customer = null;
 
             Close();
-            customer.CompleteCheckout(revenue, satisfaction);
+            customer.CompleteCheckout(revenue, costOfGoods, satisfaction);
         }
 
         void AbortSession()
@@ -504,16 +517,22 @@ namespace MonsterMart.UI
         internal object item;
 
         CheckoutView _owner;
+        RectTransform _home;
+        RectTransform _dragLayer;
         readonly ScanItemHandle _handle = new ScanItemHandle();
 
-        public void Setup(CheckoutView owner, RectTransform rt)
+        public void Setup(CheckoutView owner, RectTransform rt, RectTransform home, RectTransform dragLayer)
         {
             _owner = owner;
             RectTransform = rt;
+            _home = home;
+            _dragLayer = dragLayer;
         }
 
         public void OnBeginDrag(PointerEventData e)
         {
+            // 挪到拖拽层，这样商品会画在扫描区之上而不是被它盖住
+            if (_dragLayer != null) RectTransform.SetParent(_dragLayer, true);
             RectTransform.SetAsLastSibling();
         }
 
@@ -527,6 +546,11 @@ namespace MonsterMart.UI
         {
             _handle.item = item;
             _owner?.OnItemDropped(_handle, e.position);
+
+            // 放回台面上的原位
+            if (_home != null) RectTransform.SetParent(_home, false);
+            RectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            RectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             RectTransform.anchoredPosition = HomePosition;
         }
     }

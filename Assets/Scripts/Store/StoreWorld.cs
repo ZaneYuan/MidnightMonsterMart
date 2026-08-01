@@ -145,9 +145,10 @@ namespace MonsterMart.Store
             // 右侧饮料冰柜（两个格位）
             AddShelf("blood_orange_soda", FixtureKind.Cooler, new CellRect(19, 6, 20, 7), "饮料冰柜 · 上层");
             AddShelf("moonlight_milk", FixtureKind.Cooler, new CellRect(19, 10, 20, 11), "饮料冰柜 · 下层");
-            // 右后方工具架（两个格位）
-            AddShelf("warding_salt", FixtureKind.ToolRack, new CellRect(15, 13, 16, 13), "工具架 · 左");
-            AddShelf("all_purpose_cleaner", FixtureKind.ToolRack, new CellRect(17, 13, 18, 13), "工具架 · 右");
+            // 右后方工具架（销售）+ 清洁用品架（玩家自用，不是卖的）
+            AddShelf("warding_salt", FixtureKind.ToolRack, new CellRect(15, 13, 16, 13), "工具架 · 驱灵盐");
+            AddShelf("all_purpose_cleaner", FixtureKind.ToolRack, new CellRect(17, 13, 18, 13),
+                     "清洁用品架", supplyRack: true);
 
             // ---- 收银台 + 3 个排队点（§9.3）----
             var checkoutRect = new CellRect(5, 4, 7, 4);
@@ -185,7 +186,8 @@ namespace MonsterMart.Store
             BlockRect(trashRect);
         }
 
-        void AddShelf(string productId, FixtureKind kind, CellRect rect, string label)
+        void AddShelf(string productId, FixtureKind kind, CellRect rect, string label,
+                      bool supplyRack = false)
         {
             var product = GameDatabase.GetProduct(productId);
             if (product == null)
@@ -195,7 +197,7 @@ namespace MonsterMart.Store
             }
 
             var shelf = CreateFixture<Shelf>("Shelf_" + productId, rect);
-            shelf.Configure(product, kind, rect, label);
+            shelf.Configure(product, kind, rect, label, supplyRack);
             BlockRect(rect);
             Shelves.Add(shelf);
         }
@@ -227,21 +229,34 @@ namespace MonsterMart.Store
             return shelf != null && shelf.Usable;
         }
 
-        /// <summary>店里有多少个空货架 —— 检查员会看这个。</summary>
+        /// <summary>只统计真正对外销售的货架（清洁用品架是玩家自用的，不算）。</summary>
+        public int SalesShelfCount()
+        {
+            int n = 0;
+            for (int i = 0; i < Shelves.Count; i++)
+                if (!Shelves[i].isSupplyRack) n++;
+            return n;
+        }
+
+        /// <summary>店里有多少个空的销售货架 —— 检查员会看这个。</summary>
         public int EmptyShelfCount()
         {
             int n = 0;
             for (int i = 0; i < Shelves.Count; i++)
-                if (Shelves[i].IsEmpty) n++;
+                if (!Shelves[i].isSupplyRack && Shelves[i].IsEmpty) n++;
             return n;
         }
 
-        /// <summary>摆在货架上的禁忌商品数量 —— 检查员会看这个。</summary>
+        /// <summary>摆在销售货架上的禁忌商品数量 —— 检查员会看这个。</summary>
         public int StockedTabooCount()
         {
             int n = 0;
             for (int i = 0; i < Shelves.Count; i++)
-                if (Shelves[i].product != null && Shelves[i].product.isTaboo && !Shelves[i].IsEmpty) n++;
+            {
+                var shelf = Shelves[i];
+                if (shelf.isSupplyRack) continue;
+                if (shelf.product != null && shelf.product.isTaboo && !shelf.IsEmpty) n++;
+            }
             return n;
         }
 
@@ -331,6 +346,32 @@ namespace MonsterMart.Store
         {
             if (product == null || amount <= 0) return;
             Warehouse[product] = WarehouseCount(product) + amount;
+        }
+
+        /// <summary>
+        /// 一键把仓库里的货铺到对应货架上，返回上架件数。
+        /// 只在营业前准备阶段提供 —— 那时本来就没有时间压力，
+        /// 手动来回搬运只是重复劳动；营业中的补货压力才是玩法本体。
+        /// </summary>
+        public int AutoRestockAll()
+        {
+            int placed = 0;
+
+            for (int i = 0; i < Shelves.Count; i++)
+            {
+                var shelf = Shelves[i];
+                if (shelf == null || shelf.product == null || shelf.knockedOver) continue;
+
+                int room = shelf.capacity - shelf.count;
+                if (room <= 0) continue;
+
+                int taken = TakeFromWarehouse(shelf.product, room);
+                if (taken <= 0) continue;
+
+                placed += shelf.AddStock(taken);
+            }
+
+            return placed;
         }
 
         public int TakeFromWarehouse(ProductData product, int amount)

@@ -19,6 +19,12 @@ namespace MonsterMart.Store
         public FixtureKind kind = FixtureKind.Shelf;
         public string displayName;
 
+        /// <summary>
+        /// 清洁用品架：放的是玩家自己用的道具（万能清洁剂），不是卖给顾客的商品。
+        /// 不计入「空货架」统计，检查员也不会因为它扣分；玩家可以直接从上面取用。
+        /// </summary>
+        public bool isSupplyRack;
+
         /// <summary>被狼人撞倒 — 设计文档 §7 事件二。</summary>
         public bool knockedOver;
 
@@ -34,12 +40,14 @@ namespace MonsterMart.Store
         public bool IsFull => count >= capacity;
         public bool Usable => !knockedOver && !IsEmpty;
 
-        public void Configure(ProductData assignedProduct, FixtureKind fixtureKind, CellRect rect, string label)
+        public void Configure(ProductData assignedProduct, FixtureKind fixtureKind, CellRect rect,
+                              string label, bool supplyRack = false)
         {
             product = assignedProduct;
             kind = fixtureKind;
             cells = rect;
             displayName = label;
+            isSupplyRack = supplyRack;
             count = 0;
             knockedOver = false;
             BuildVisuals();
@@ -76,7 +84,10 @@ namespace MonsterMart.Store
             _badgeRoot = badgeGo.transform;
 
             _emptyBadge = badgeGo.AddComponent<SpriteRenderer>();
-            _emptyBadge.sprite = SpriteFactory.Circle(new Color(0.86f, 0.20f, 0.22f, 0.92f), 30);
+            // 清洁用品架空了不是事故，用蓝色提示而不是刺眼的红色
+            _emptyBadge.sprite = SpriteFactory.Circle(
+                isSupplyRack ? new Color(0.24f, 0.52f, 0.82f, 0.90f)
+                             : new Color(0.86f, 0.20f, 0.22f, 0.92f), 30);
             _emptyBadge.sortingOrder = SortingLayers.FixtureOverlay;
             _emptyBadge.enabled = false;
 
@@ -234,10 +245,15 @@ namespace MonsterMart.Store
             return Game.Store != null && Game.Store.AnyGhostWaitingFor(product);
         }
 
+        /// <summary>清洁用品架：空手走过去就能取用，省得跑一趟仓库。</summary>
+        bool CanTakeSupply(PlayerController player)
+            => isSupplyRack && player != null && player.Carry.IsEmpty && count > 0 && !knockedOver;
+
         public override bool IsAvailable(PlayerController player)
         {
             if (knockedOver) return true;
             if (player == null) return false;
+            if (CanTakeSupply(player)) return true;
             if (CanPickForGhost(player)) return true;
             if (IsFull) return false;
             return player.Carry.Has(product);
@@ -246,10 +262,13 @@ namespace MonsterMart.Store
         public override string GetPrompt(PlayerController player)
         {
             if (knockedOver) return "[E] 扶起货架";
+            if (CanTakeSupply(player))
+                return $"[E] 取用 {product.displayName}（架上 {count}）";
             if (CanPickForGhost(player)) return $"[E] 取下 {product.displayName}（幽灵在等）";
 
             int amount = Mathf.Min(player.Carry.Count, capacity - count);
-            return $"[E] 补货 · {product.displayName} ×{amount}（{count}/{capacity}）";
+            string verb = isSupplyRack ? "补充清洁用品" : "补货";
+            return $"[E] {verb} · {product.displayName} ×{amount}（{count}/{capacity}）";
         }
 
         public override InteractionKind Kind => InteractionKind.Hold;
@@ -257,6 +276,7 @@ namespace MonsterMart.Store
         public override float HoldSeconds(PlayerController player)
         {
             if (knockedOver) return GameConfig.LiftShelfSeconds;
+            if (CanTakeSupply(player)) return 0.3f;
             if (CanPickForGhost(player)) return 0.35f;
 
             int amount = Mathf.Min(player.Carry.Count, capacity - count);
@@ -269,6 +289,17 @@ namespace MonsterMart.Store
             {
                 Lift();
                 Game.Audio?.PlayRestock();
+                return;
+            }
+
+            if (CanTakeSupply(player))
+            {
+                int taken = Mathf.Min(count, GameConfig.PlayerCarryCapacity);
+                count -= taken;
+                player.Carry.Take(product, taken);
+                Refresh();
+                Game.Audio?.PlayPickup();
+                Game.UI?.Hud?.Flash($"取用 {product.displayName} ×{taken}");
                 return;
             }
 
