@@ -204,10 +204,8 @@ namespace MonsterMart.UI
             UIFactory.Anchor(_moneyLabel.rectTransform, new Vector2(0, 0), new Vector2(0, 0),
                              new Vector2(200, 62), new Vector2(340, 36));
 
-            var start = UIFactory.Button(window, "开始营业", () =>
-            {
-                Game.Manager.BeginBusiness();
-            }, 26, new Color(0.30f, 0.52f, 0.34f));
+            var start = UIFactory.Button(window, "开始营业", TryBeginBusiness,
+                                         26, new Color(0.30f, 0.52f, 0.34f));
             UIFactory.Anchor(start.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-160, 62), new Vector2(240, 56));
 
@@ -237,6 +235,33 @@ namespace MonsterMart.UI
             }
 
             RefreshAll();
+        }
+
+        /// <summary>
+        /// 仓库空着就开门 = 这一天必然失败（没货可补、没东西可卖）。
+        /// 新玩家很容易直接点「开始营业」，所以在这里拦一道。
+        /// </summary>
+        void TryBeginBusiness()
+        {
+            int totalStock = 0;
+            for (int i = 0; i < GameDatabase.Products.Count; i++)
+                totalStock += Game.Store.WarehouseCount(GameDatabase.Products[i]);
+
+            bool shelvesEmpty = Game.Store.EmptyShelfCount() >= Game.Store.Shelves.Count;
+
+            if (totalStock <= 0 && shelvesEmpty)
+            {
+                Game.Audio?.PlayError();
+                Game.UI.ShowChoice(
+                    "仓库是空的",
+                    "你还没有进任何货。这样开门的话，货架永远补不满，顾客买不到东西，\n" +
+                    "这一天的目标不可能完成。\n\n建议先在左侧商品列表点 +1 / +5 买一些。",
+                    new ChoiceOption("回去进货", "推荐", () => { }),
+                    new ChoiceOption("我知道，照样开门", "空手营业", () => Game.Manager.BeginBusiness()));
+                return;
+            }
+
+            Game.Manager.BeginBusiness();
         }
 
         void Buy(ProductData product, int amount)
@@ -275,7 +300,13 @@ namespace MonsterMart.UI
 
         void RefreshAll()
         {
-            _moneyLabel.text = $"当前资金 {Game.Economy.Money}";
+            int totalStock = 0;
+            for (int i = 0; i < GameDatabase.Products.Count; i++)
+                totalStock += Game.Store.WarehouseCount(GameDatabase.Products[i]);
+
+            _moneyLabel.text = totalStock > 0
+                ? $"当前资金 {Game.Economy.Money}　·　仓库共 {totalStock} 件"
+                : $"当前资金 {Game.Economy.Money}　·　<color=#F26B61>仓库是空的，先买点货</color>";
 
             for (int i = 0; i < _rows.Count; i++)
             {

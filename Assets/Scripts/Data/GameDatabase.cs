@@ -285,9 +285,10 @@ namespace MonsterMart.Data
             d1.dayNumber = 1;
             d1.title = "第一天 · 基础教学";
             d1.briefing =
-                "今晚只有几位老顾客。\n" +
-                "先熟悉流程：去仓库拿货 → 走到货架前长按 E 补货 → 顾客排队后到收银台扫码。\n" +
-                "史莱姆会留下污渍，记得进一瓶万能清洁剂。";
+                "今晚会来 4 位客人：2 个史莱姆、2 个吸血鬼。\n" +
+                "① 先在左边买货 —— 建议：发光果冻 +5（史莱姆爱喝）、血橙汽水 +5（吸血鬼爱喝）、万能清洁剂 +1（擦史莱姆的污渍）。\n" +
+                "② 点「开始营业」后：走到上方仓库门按 E 拿货 → 走到对应货架前<b>长按 E</b> 补货。\n" +
+                "③ 顾客排队后走到收银台按 E，把商品拖到右边扫描区，再点结算。";
             d1.businessSeconds = 200f;
             d1.spawns.Add(new SpawnEntry(MonsterType.Slime, 6f));
             d1.spawns.Add(new SpawnEntry(MonsterType.Vampire, 42f));
