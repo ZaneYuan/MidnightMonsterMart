@@ -31,6 +31,13 @@ namespace MonsterMart.Data
         [Tooltip("摆在货架上时会持续惹恼讨厌它的怪物（禁忌商品）")]
         public bool isTaboo;
 
+        [Header("预约条线索")]
+        [Tooltip("顾客想买它时留下的模糊描述")]
+        [TextArea(1, 3)] public string wantClue;
+
+        [Tooltip("顾客讨厌它时留下的警告")]
+        [TextArea(1, 3)] public string avoidClue;
+
         [Header("表现")]
         [Tooltip("程序化生成占位图标时使用的主色")]
         public Color tintColor = Color.white;

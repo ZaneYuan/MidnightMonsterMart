@@ -199,8 +199,8 @@ namespace MonsterMart.UI
             UIFactory.Anchor(box.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f),
                              new Vector2(-330, ColumnCenterY), new Vector2(600, BoxHeight));
 
-            // ---- 今晚客流（设计文档 §2.1「查看当天可能出现的顾客类型」）----
-            var crowdHeader = UIFactory.Label(box.transform, "今晚客流", 23, UIFactory.Accent,
+            // ---- 今晚的预约条（设计文档 §2.1 的推理版实现）----
+            var crowdHeader = UIFactory.Label(box.transform, "今晚的预约条", 23, UIFactory.Accent,
                                               TextAnchor.MiddleLeft, "CrowdHeader");
             UIFactory.Anchor(crowdHeader.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
                              new Vector2(0, -26), new Vector2(-32, 30));
@@ -242,27 +242,16 @@ namespace MonsterMart.UI
             _shelfPreview = listRt;
         }
 
-        /// <summary>按当天的波次表统计各类怪物数量，并列出它们的偏好与禁忌。</summary>
+        /// <summary>
+        /// 展示今晚的预约条。只给线索、不点名 —— 玩家要自己翻译成进货清单。
+        /// 对照表在怪物图鉴里（Tab）。
+        /// </summary>
         void RefreshCrowd(DayPlan plan)
         {
-            var counts = new Dictionary<MonsterType, int>();
-            var order = new List<MonsterType>();
+            var notes = Game.Day != null ? Game.Day.Notes : null;
+            int noteCount = notes != null ? notes.Count : 0;
 
-            if (plan != null)
-            {
-                for (int i = 0; i < plan.spawns.Count; i++)
-                {
-                    var type = plan.spawns[i].monsterType;
-                    if (!counts.ContainsKey(type))
-                    {
-                        counts[type] = 0;
-                        order.Add(type);
-                    }
-                    counts[type]++;
-                }
-            }
-
-            while (_crowdRows.Count < order.Count)
+            while (_crowdRows.Count < noteCount)
             {
                 var label = UIFactory.Label(_crowdList, "", 16, UIFactory.Ink,
                                             TextAnchor.MiddleLeft, "CrowdRow");
@@ -272,42 +261,21 @@ namespace MonsterMart.UI
 
             for (int i = 0; i < _crowdRows.Count; i++)
             {
-                if (i >= order.Count)
+                if (i >= noteCount)
                 {
                     _crowdRows[i].text = "";
                     continue;
                 }
 
-                var type = order[i];
-                var data = GameDatabase.GetCustomer(type);
-                if (data == null) { _crowdRows[i].text = ""; continue; }
-
-                if (type == MonsterType.Inspector)
-                {
-                    _crowdRows[i].text =
-                        $"<b>{data.displayName}</b> ×{counts[type]}　" +
-                        "<color=#AAAABB>检查缺货 / 整洁 / 禁忌商品 / 满意度</color>";
-                    continue;
-                }
-
-                _crowdRows[i].text =
-                    $"<b>{data.displayName}</b> ×{counts[type]}　" +
-                    $"<color=#7CE07C>要买 {JoinNames(GameDatabase.PreferredProducts(type))}</color>　" +
-                    $"<color=#F26B61>忌 {JoinNames(GameDatabase.DislikedProducts(type))}</color>";
+                var note = notes[i];
+                string tail = note.count > 1 ? $"　<color=#FFD966>×{note.count}</color>" : "";
+                _crowdRows[i].text = $"<color=#8FA8C8>·</color> 「{note.text}」{tail}";
             }
 
             int total = plan != null ? plan.TotalCustomers : 0;
             int perHead = plan != null ? plan.maxItemsPerCustomer : 0;
-            _crowdSummary.text = $"共 {total} 位客人，每人最多买 {perHead} 件 —— 备货够卖就行，多进的算库存。";
-        }
-
-        static string JoinNames(List<ProductData> products)
-        {
-            if (products == null || products.Count == 0) return "—";
-
-            var parts = new string[products.Count];
-            for (int i = 0; i < products.Count; i++) parts[i] = products[i].displayName;
-            return string.Join("、", parts);
+            _crowdSummary.text =
+                $"共 {total} 位客人，每人最多买 {perHead} 件。看不懂线索就按 Tab 查图鉴。";
         }
 
         void BuildFooter(Transform window)

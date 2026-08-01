@@ -336,11 +336,16 @@ namespace MonsterMart.Events
             else if (cleanliness >= 55f) { score += 1; lines.Add("△ 店内还算干净"); }
             else lines.Add("✗ 地上到处是污渍");
 
-            // 3. 禁忌商品摆放
-            int taboo = store.StockedTabooCount();
-            if (taboo == 0) { score += 2; lines.Add("✓ 没有乱摆禁忌商品"); }
-            else if (taboo <= 1) { score += 1; lines.Add("△ 有 1 类禁忌商品摆在明面上"); }
-            else lines.Add($"✗ 有 {taboo} 类禁忌商品摆在明面上");
+            // 3. 服务事故
+            //
+            // 原本这一项是「有没有乱摆禁忌商品」。改用交叉禁忌的商品表之后，
+            // 几乎每件商品都是某位顾客的禁忌，「零禁忌」在有全部四种怪物的
+            // 第三天根本不可能达成，这条判据就废了。
+            // 改为看实际后果：有没有顾客被气走。
+            int incidents = day.LeftAngry;
+            if (incidents == 0) { score += 2; lines.Add("✓ 没有顾客被气走"); }
+            else if (incidents <= 1) { score += 1; lines.Add("△ 有 1 位顾客生气离开"); }
+            else lines.Add($"✗ 有 {incidents} 位顾客生气离开");
 
             // 4. 顾客满意度
             float happyRatio = day.Served > 0 ? day.Happy / (float)day.Served : 0f;

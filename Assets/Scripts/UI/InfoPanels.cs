@@ -267,7 +267,10 @@ namespace MonsterMart.UI
 
                 if (!BestiaryTracker.IsDiscovered(data.monsterType))
                 {
-                    _entries[i].text = "<b>???</b>\n还没有见过这位客人。";
+                    // 没见过的客人只留下传闻 —— 预约条里的线索得靠商品名自己推
+                    _entries[i].text =
+                        "<b>???</b>\n还没有见过这位客人。\n" +
+                        $"<color=#8FA8C8>传闻</color>：{data.arrivalClue}";
                     _entries[i].color = UIFactory.InkDim;
                     continue;
                 }
@@ -275,10 +278,20 @@ namespace MonsterMart.UI
                 _entries[i].color = UIFactory.Ink;
                 _entries[i].text =
                     $"<b>{data.displayName}</b>\n" +
-                    $"<color=#7CE07C>喜欢</color>：{data.bestiaryLikes}　　" +
-                    $"<color=#F26B61>讨厌</color>：{data.bestiaryDislikes}\n" +
+                    $"<color=#7CE07C>喜欢</color>：{ProductNames(GameDatabase.PreferredProducts(data.monsterType))}　　" +
+                    $"<color=#F26B61>讨厌</color>：{ProductNames(GameDatabase.DislikedProducts(data.monsterType))}\n" +
                     $"<color=#D89EFF>规则</color>：{data.bestiaryRule}";
             }
+        }
+
+        /// <summary>喜欢 / 讨厌列表直接从商品表推导，改数值时不会和图鉴文案脱节。</summary>
+        static string ProductNames(List<ProductData> products)
+        {
+            if (products == null || products.Count == 0) return "—";
+
+            var parts = new string[products.Count];
+            for (int i = 0; i < products.Count; i++) parts[i] = products[i].displayName;
+            return string.Join("、", parts);
         }
     }
 

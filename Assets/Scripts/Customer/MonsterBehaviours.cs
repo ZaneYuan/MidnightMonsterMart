@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MonsterMart.Core;
 using MonsterMart.Data;
 using MonsterMart.Store;
@@ -10,8 +10,14 @@ namespace MonsterMart.Customers
     {
         const float MirrorRange = 4.5f;
         const float MirrorDrainPerSecond = 6f;
-        const float TabooRange = 2.6f;
-        const float TabooDrainPerSecond = 4f;
+
+        /// <summary>
+        /// 禁忌商品的影响范围与强度。现在几乎每件商品都是某位顾客的禁忌
+        /// （见 GameDatabase 的商品表），所以数值要比一件禁忌品时保守，
+        /// 否则顾客一进店就被各种货架轮流扣耐心。
+        /// </summary>
+        public const float TabooRange = 2.2f;
+        public const float TabooDrainPerSecond = 3.5f;
 
         bool _bagRequestRolled;
 
@@ -92,7 +98,8 @@ namespace MonsterMart.Customers
         {
             customer.ExtraDecayMultiplier = _warningRaised ? 1.5f : 1f;
 
-            VampireBehaviour.DrainNearTaboo(customer, MonsterType.Werewolf, 3.0f, 5f);
+            VampireBehaviour.DrainNearTaboo(customer, MonsterType.Werewolf,
+                VampireBehaviour.TabooRange, VampireBehaviour.TabooDrainPerSecond);
 
             if (_warningRaised)
             {
@@ -150,7 +157,8 @@ namespace MonsterMart.Customers
         {
             customer.ExtraDecayMultiplier = 1f;
             // 驱灵盐摆出来会持续惹恼幽灵
-            VampireBehaviour.DrainNearTaboo(customer, MonsterType.Ghost, 3.2f, 6f);
+            VampireBehaviour.DrainNearTaboo(customer, MonsterType.Ghost,
+                VampireBehaviour.TabooRange, VampireBehaviour.TabooDrainPerSecond);
         }
     }
 

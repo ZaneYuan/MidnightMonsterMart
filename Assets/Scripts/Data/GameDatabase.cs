@@ -89,53 +89,74 @@ namespace MonsterMart.Data
         // ------------------------------------------------------------------
         // 商品 — 设计文档 §2.2
         // ------------------------------------------------------------------
+        /// <summary>
+        /// 商品表。核心设计：<b>几乎每件商品都是一位顾客的心头好、同时是另一位的禁忌</b>。
+        /// 这样「摆不摆」永远有代价，进货就从抄作业变成下注。
+        ///
+        /// 　商品　　　　　喜欢　　讨厌
+        /// 　血橙汽水　　　吸血鬼　—
+        /// 　月光牛奶　　　狼人　　史莱姆（乳制品会让它结块）
+        /// 　灵魂薄荷糖　　幽灵　　狼人（薄荷冲鼻）
+        /// 　发光果冻　　　史莱姆　吸血鬼（会发光，刺眼）
+        /// 　黑蒜面包　　　狼人　　吸血鬼（蒜）
+        /// 　银纸巧克力　　吸血鬼　狼人（银）
+        /// 　驱灵盐　　　　史莱姆　幽灵（盐）
+        /// </summary>
         static void BuildProducts()
         {
             _products.Add(MakeProduct(
                 "blood_orange_soda", "血橙汽水", ProductCategory.Drink, 4, 8,
                 MonsterType.Vampire, true, default, false,
-                new Color(0.78f, 0.13f, 0.22f), 0));
+                new Color(0.78f, 0.13f, 0.22f), 0,
+                "老位置，那瓶红色的，要冰的。",
+                null));
 
             _products.Add(MakeProduct(
                 "moonlight_milk", "月光牛奶", ProductCategory.Drink, 5, 10,
-                MonsterType.Werewolf, true, default, false,
-                new Color(0.88f, 0.90f, 0.98f), 0));
+                MonsterType.Werewolf, true, MonsterType.Slime, true,
+                new Color(0.88f, 0.90f, 0.98f), 0,
+                "满月的日子我要喝白色的那个。",
+                "别让我碰到乳白色的液体，我会结块。"));
 
             _products.Add(MakeProduct(
                 "soul_mint", "灵魂薄荷糖", ProductCategory.Snack, 3, 7,
-                MonsterType.Ghost, true, default, false,
-                new Color(0.55f, 0.92f, 0.80f), 1));
+                MonsterType.Ghost, true, MonsterType.Werewolf, true,
+                new Color(0.55f, 0.92f, 0.80f), 1,
+                "我生前最喜欢清凉的味道。",
+                "薄荷味太冲了，我的鼻子受不了。"));
 
             _products.Add(MakeProduct(
                 "glow_jelly", "发光果冻", ProductCategory.Snack, 4, 9,
-                MonsterType.Slime, true, default, false,
-                new Color(0.60f, 0.95f, 0.35f), 2));
+                MonsterType.Slime, true, MonsterType.Vampire, true,
+                new Color(0.60f, 0.95f, 0.35f), 2,
+                "要那个在黑暗里会发光的，软软的。",
+                "把会发光的东西收起来，太刺眼了。"));
 
-            var blackGarlic = MakeProduct(
+            _products.Add(MakeProduct(
                 "black_garlic_bread", "黑蒜面包", ProductCategory.Food, 3, 6,
-                default, false, MonsterType.Vampire, true,
-                new Color(0.35f, 0.28f, 0.22f), 3);
-            blackGarlic.isTaboo = true;
-            _products.Add(blackGarlic);
+                MonsterType.Werewolf, true, MonsterType.Vampire, true,
+                new Color(0.35f, 0.28f, 0.22f), 3,
+                "那种闻起来很冲的面包，来两个。",
+                "如果店里有蒜味，我掉头就走。"));
 
-            var silverChoc = MakeProduct(
+            _products.Add(MakeProduct(
                 "silver_chocolate", "银纸巧克力", ProductCategory.Snack, 5, 11,
-                default, false, MonsterType.Werewolf, true,
-                new Color(0.72f, 0.74f, 0.80f), 1);
-            silverChoc.isTaboo = true;
-            _products.Add(silverChoc);
+                MonsterType.Vampire, true, MonsterType.Werewolf, true,
+                new Color(0.72f, 0.74f, 0.80f), 1,
+                "包装亮亮的那款，像镜子一样。",
+                "别让我看到银色的包装。"));
 
-            var wardSalt = MakeProduct(
+            _products.Add(MakeProduct(
                 "warding_salt", "驱灵盐", ProductCategory.Tool, 6, 14,
-                default, false, MonsterType.Ghost, true,
-                new Color(0.95f, 0.95f, 0.88f), 3);
-            wardSalt.isTaboo = true;
-            _products.Add(wardSalt);
+                MonsterType.Slime, true, MonsterType.Ghost, true,
+                new Color(0.95f, 0.95f, 0.88f), 3,
+                "我需要补点矿物质，白色的颗粒。",
+                "盐……请让它离我远一点。"));
 
             var cleaner = MakeProduct(
                 "all_purpose_cleaner", "万能清洁剂", ProductCategory.Tool, 5, 12,
                 default, false, default, false,
-                new Color(0.30f, 0.70f, 0.95f), 2);
+                new Color(0.30f, 0.70f, 0.95f), 2, null, null);
             cleaner.isCleaningTool = true;
             _products.Add(cleaner);
         }
@@ -145,7 +166,8 @@ namespace MonsterMart.Data
             int buy, int sell,
             MonsterType preferredBy, bool hasPreference,
             MonsterType dislikedBy, bool hasDislike,
-            Color tint, int shape)
+            Color tint, int shape,
+            string wantClue, string avoidClue)
         {
             var p = ScriptableObject.CreateInstance<ProductData>();
             p.name = id;
@@ -158,8 +180,11 @@ namespace MonsterMart.Data
             p.hasPreference = hasPreference;
             p.dislikedBy = dislikedBy;
             p.hasDislike = hasDislike;
+            p.isTaboo = hasDislike;     // 有人讨厌 = 摆出来就会持续惹恼那位顾客
             p.tintColor = tint;
             p.iconShape = shape;
+            p.wantClue = wantClue;
+            p.avoidClue = avoidClue;
             return p;
         }
 
@@ -184,9 +209,8 @@ namespace MonsterMart.Data
             vampire.bodyColor = new Color(0.16f, 0.13f, 0.22f);
             vampire.accentColor = new Color(0.85f, 0.16f, 0.22f);
             vampire.silhouette = 0;
-            vampire.bestiaryLikes = "血橙汽水、红色饮料、高价商品";
-            vampire.bestiaryDislikes = "黑蒜面包、强光、镜子";
             vampire.bestiaryRule = "靠近装饰镜时会持续掉耐心。营业前可以移走或遮住镜子，但普通顾客会因此少一点满意度。结账时可能要求换成黑色袋子。";
+            vampire.arrivalClue = "有位客人特别在意店里的镜子。";
             _customers.Add(vampire);
 
             var werewolf = ScriptableObject.CreateInstance<CustomerData>();
@@ -205,9 +229,8 @@ namespace MonsterMart.Data
             werewolf.bodyColor = new Color(0.42f, 0.30f, 0.18f);
             werewolf.accentColor = new Color(0.92f, 0.78f, 0.35f);
             werewolf.silhouette = 1;
-            werewolf.bestiaryLikes = "月光牛奶、大包装食品";
-            werewolf.bestiaryDislikes = "银纸巧克力、高亮灯光、长时间排队";
             werewolf.bestiaryRule = "耐心掉得比谁都快。低于 20 时会撞倒附近货架，商品散落、整洁度 -20。满月夜入店即进入情绪警告。";
+            werewolf.arrivalClue = "有位客人今晚情绪不太稳定。";
             _customers.Add(werewolf);
 
             var ghost = ScriptableObject.CreateInstance<CustomerData>();
@@ -226,9 +249,8 @@ namespace MonsterMart.Data
             ghost.bodyColor = new Color(0.72f, 0.82f, 0.92f);
             ghost.accentColor = new Color(0.45f, 0.62f, 0.85f);
             ghost.silhouette = 2;
-            ghost.bestiaryLikes = "灵魂薄荷糖、冷藏商品、旧物";
-            ghost.bestiaryDislikes = "驱灵盐、强烈噪音、被忽视";
             ghost.bestiaryRule = "碰不到实体商品。你必须替它取货、送到灵界包装台处理后再交给它。它有时会忘记自己要买什么，需要你根据提示猜。";
+            ghost.arrivalClue = "有位客人说自己碰不到实体的东西。";
             _customers.Add(ghost);
 
             var slime = ScriptableObject.CreateInstance<CustomerData>();
@@ -247,9 +269,8 @@ namespace MonsterMart.Data
             slime.bodyColor = new Color(0.45f, 0.88f, 0.52f);
             slime.accentColor = new Color(0.20f, 0.55f, 0.28f);
             slime.silhouette = 3;
-            slime.bestiaryLikes = "发光果冻、各种饮料、包装鲜艳的商品";
-            slime.bestiaryDislikes = "干燥环境、尖锐物品、被驱赶";
             slime.bestiaryRule = "移动时会留下污渍，拉低整洁度并拖慢你的移动。用万能清洁剂清理。偶尔会一口吞下两件商品，结账时你要决定怎么收费。";
+            slime.arrivalClue = "有位客人走过的地方会留下水痕。";
             _customers.Add(slime);
 
             var inspector = ScriptableObject.CreateInstance<CustomerData>();
@@ -268,9 +289,8 @@ namespace MonsterMart.Data
             inspector.bodyColor = new Color(0.30f, 0.30f, 0.34f);
             inspector.accentColor = new Color(0.85f, 0.80f, 0.55f);
             inspector.silhouette = 4;
-            inspector.bestiaryLikes = "整洁的店铺、充足的库存";
-            inspector.bestiaryDislikes = "缺货、污渍、错误摆放的禁忌商品";
-            inspector.bestiaryRule = "第三天固定出现。穿着风衣，看不出种类。他会检查缺货、整洁度、禁忌商品摆放和顾客满意度，然后给出 A / B / C 或停业警告。";
+            inspector.bestiaryRule = "第三天固定出现。穿着风衣，看不出种类。他会检查缺货、整洁度、服务事故和顾客满意度，然后给出 A / B / C 或停业警告。";
+            inspector.arrivalClue = "有人递来一张空白的预约条。";
             _customers.Add(inspector);
         }
 
@@ -285,10 +305,10 @@ namespace MonsterMart.Data
             d1.dayNumber = 1;
             d1.title = "第一天 · 基础教学";
             d1.briefing =
-                "今晚 4 位客人：2 个史莱姆、2 个吸血鬼，每人只买 1 件。\n" +
-                "① 先买货：发光果冻 +5（史莱姆爱吃）、血橙汽水 +5（吸血鬼爱喝）、万能清洁剂 +1（擦污渍）。\n" +
-                "② 点「<b>先去店里摆货</b>」关掉面板 —— 准备阶段没有时间限制，顾客不会来。\n" +
-                "③ 仓库门按 E 拿货 → 走到<b>亮黄框</b>的货架前<b>长按 E</b> 摆上去 → 摆完点「开始营业」。";
+                "右边是今晚收到的预约条 —— 客人不会报自己是谁，只留下一句话。\n" +
+                "对着商品列表想想他们要什么，把货备上。<b>猜错了就是白进货 + 客人空手离开。</b>\n" +
+                "注意：几乎每件商品都有人爱、有人忌 —— 摆上货架赚一个人的钱，就可能得罪另一个。\n" +
+                "买完点「一键摆货」铺到货架上，再点「开始营业」。别忘了留一瓶万能清洁剂擦地。";
             d1.businessSeconds = 200f;
             d1.maxItemsPerCustomer = 1;   // 教学日：一人只买一件
             d1.spawns.Add(new SpawnEntry(MonsterType.Slime, 12f));
@@ -307,9 +327,9 @@ namespace MonsterMart.Data
             d2.dayNumber = 2;
             d2.title = "第二天 · 压力增加";
             d2.briefing =
-                "满月。狼人今晚会来，而且脾气很差。\n" +
-                "月光牛奶一定要备够，银纸巧克力最好别摆在他会经过的货架上。\n" +
-                "顾客开始排队了，收银慢一点整条队伍都会掉耐心。";
+                "满月。今晚的预约条里有两位新面孔 —— 图鉴里还没有它们的记录，只能靠商品名硬猜。\n" +
+                "人多了，喜好开始互相打架：同一件商品可能是一位客人的心头好、另一位的禁区。\n" +
+                "摆之前先想清楚今晚谁会来。顾客开始排队了，收银慢一点整条队伍都会掉耐心。";
             d2.businessSeconds = 260f;
             d2.maxItemsPerCustomer = 2;
             d2.spawns.Add(new SpawnEntry(MonsterType.Slime, 5f));
@@ -335,8 +355,8 @@ namespace MonsterMart.Data
             d3.title = "第三天 · 综合测试";
             d3.briefing =
                 "午夜商业管理局今晚会派检查员来。他穿着风衣，混在顾客里，你分不出是谁。\n" +
-                "他检查四件事：有没有缺货、店里干不干净、禁忌商品有没有乱摆、顾客满不满意。\n" +
-                "把店撑住。";
+                "他检查四件事：有没有缺货、店里干不干净、有没有顾客被气走、顾客满不满意。\n" +
+                "四种怪物今晚全会到场 —— 每件商品都会同时讨好一个人、得罪另一个人。撑住。";
             d3.businessSeconds = 320f;
             d3.maxItemsPerCustomer = 3;
             d3.spawns.Add(new SpawnEntry(MonsterType.Slime, 4f));

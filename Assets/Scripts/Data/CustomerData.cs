@@ -35,9 +35,10 @@ namespace MonsterMart.Data
         public int silhouette;
 
         [Header("图鉴")]
-        [TextArea(2, 5)] public string bestiaryLikes;
-        [TextArea(2, 5)] public string bestiaryDislikes;
         [TextArea(2, 5)] public string bestiaryRule;
+
+        [Tooltip("预约条上暗示身份的线索（不点名）")]
+        [TextArea(1, 3)] public string arrivalClue;
 
         [System.NonSerialized] public Sprite runtimeSprite;
 

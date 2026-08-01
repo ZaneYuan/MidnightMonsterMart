@@ -51,6 +51,9 @@ namespace MonsterMart.Core
         public InspectionGrade InspectionResult { get; set; } = InspectionGrade.C;
         public bool InspectionDone { get; set; }
 
+        /// <summary>今晚的预约条线索（营业前界面展示，玩家据此推断该进什么货）。</summary>
+        public List<NightNote> Notes { get; private set; } = new List<NightNote>();
+
         int _reputationAtDayStart;
 
         public float ElapsedNormalized =>
@@ -67,6 +70,7 @@ namespace MonsterMart.Core
             CurrentPlan = GameDatabase.GetDay(CurrentDay);
             BusinessDuration = CurrentPlan != null ? CurrentPlan.businessSeconds : 200f;
             TimeRemaining = BusinessDuration;
+            Notes = NightNotes.Build(CurrentPlan);
 
             Served = 0;
             Happy = 0;
