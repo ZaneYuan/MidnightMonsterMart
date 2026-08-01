@@ -101,6 +101,10 @@ namespace MonsterMart.Data
 
         // ---------- 存档 ----------
         public const string SaveFileName = "midnight_monster_mart_save.json";
-        public const int SaveVersion = 1;
+        /// <summary>
+        /// 改动起始资金 / 难度数值后要 +1 —— 旧存档会被忽略，
+        /// 否则玩家会带着上一版的钱进新版本（比如身上 0 块钱开局，直接卡死）。
+        /// </summary>
+        public const int SaveVersion = 2;
     }
 }
