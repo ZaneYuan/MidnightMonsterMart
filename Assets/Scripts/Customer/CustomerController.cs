@@ -126,6 +126,10 @@ namespace MonsterMart.Customers
             var preferred = GameDatabase.PreferredProducts(Data.monsterType);
             int want = Data.RollItemCount();
 
+            // 当天的上限（教学日只买 1~2 件，玩家才来得及补货）
+            var plan = Game.Day != null ? Game.Day.CurrentPlan : null;
+            if (plan != null) want = Mathf.Clamp(want, 1, Mathf.Max(1, plan.maxItemsPerCustomer));
+
             // 至少买一件自己喜欢的
             if (preferred.Count > 0)
                 ShoppingList.Add(preferred[Random.Range(0, preferred.Count)]);

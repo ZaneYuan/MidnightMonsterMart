@@ -89,6 +89,15 @@ namespace MonsterMart.Core
                 (State == GameState.Open || State == GameState.Preparation))
             {
                 Game.UI.ToggleBestiary();
+                return;
+            }
+
+            // 准备阶段可以随时调出进货界面，买完再关掉继续摆货
+            if (InputReader.BuyMenuPressed &&
+                State == GameState.Preparation &&
+                !Game.UI.BlocksWorldInput)
+            {
+                Game.UI.ShowPreparation();
             }
         }
 

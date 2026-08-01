@@ -209,16 +209,22 @@ namespace MonsterMart.UI
             UIFactory.Anchor(start.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-160, 62), new Vector2(240, 56));
 
-            var bestiary = UIFactory.Button(window, "查看图鉴 (Tab)", () =>
+            // 关掉面板去店里摆货 —— 准备阶段没有时间限制（设计文档 §2.1）
+            var stock = UIFactory.Button(window, "先去店里摆货", Close, 22,
+                                         new Color(0.28f, 0.38f, 0.55f));
+            UIFactory.Anchor(stock.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
+                             new Vector2(-420, 62), new Vector2(240, 56));
+
+            var bestiary = UIFactory.Button(window, "图鉴 (Tab)", () =>
             {
                 Game.UI.ToggleBestiary();
             }, 20);
             UIFactory.Anchor(bestiary.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
-                             new Vector2(-420, 62), new Vector2(220, 56));
+                             new Vector2(-640, 62), new Vector2(170, 56));
 
             _upgradeButton = UIFactory.Button(window, "", UpgradeCheckout, 20);
             UIFactory.Anchor(_upgradeButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
-                             new Vector2(-680, 62), new Vector2(280, 56));
+                             new Vector2(-880, 62), new Vector2(280, 56));
             _upgradeLabel = _upgradeButton.GetComponentInChildren<Text>();
         }
 
@@ -241,7 +247,7 @@ namespace MonsterMart.UI
         /// 仓库空着就开门 = 这一天必然失败（没货可补、没东西可卖）。
         /// 新玩家很容易直接点「开始营业」，所以在这里拦一道。
         /// </summary>
-        void TryBeginBusiness()
+        public void TryBeginBusiness()
         {
             int totalStock = 0;
             for (int i = 0; i < GameDatabase.Products.Count; i++)

@@ -35,6 +35,9 @@ namespace MonsterMart.Data
         [Header("节奏")]
         public float businessSeconds = 200f;
 
+        [Tooltip("当天每位顾客最多买几件（教学日调低，避免玩家来不及补货）")]
+        public int maxItemsPerCustomer = 3;
+
         [Header("顾客波次")]
         public List<SpawnEntry> spawns = new List<SpawnEntry>();
 

@@ -286,14 +286,17 @@ namespace MonsterMart.Data
             d1.title = "第一天 · 基础教学";
             d1.briefing =
                 "今晚会来 4 位客人：2 个史莱姆、2 个吸血鬼。\n" +
-                "① 先在左边买货 —— 建议：发光果冻 +5（史莱姆爱喝）、血橙汽水 +5（吸血鬼爱喝）、万能清洁剂 +1（擦史莱姆的污渍）。\n" +
-                "② 点「开始营业」后：走到上方仓库门按 E 拿货 → 走到对应货架前<b>长按 E</b> 补货。\n" +
-                "③ 顾客排队后走到收银台按 E，把商品拖到右边扫描区，再点结算。";
+                "① 先在左边买货 —— 建议：发光果冻 +5（史莱姆爱吃）、血橙汽水 +5（吸血鬼爱喝）、万能清洁剂 +1（擦史莱姆的污渍）。\n" +
+                "② 点「<b>先去店里摆货</b>」关掉这个面板 —— <b>准备阶段没有时间限制</b>。\n" +
+                "　 走到上方仓库门按 E 拿货 → 走到亮黄框的那个货架前<b>长按 E</b> 摆上去。\n" +
+                "③ 货摆好了，再点顶部的「开始营业」。顾客会自己去货架拿东西，你不用递给他们。\n" +
+                "④ 顾客到收银台排队后，走过去按 E，把商品拖到右边绿色扫描区，再点结算。";
             d1.businessSeconds = 200f;
-            d1.spawns.Add(new SpawnEntry(MonsterType.Slime, 6f));
-            d1.spawns.Add(new SpawnEntry(MonsterType.Vampire, 42f));
-            d1.spawns.Add(new SpawnEntry(MonsterType.Slime, 88f));
-            d1.spawns.Add(new SpawnEntry(MonsterType.Vampire, 130f));
+            d1.maxItemsPerCustomer = 1;   // 教学日：一人只买一件
+            d1.spawns.Add(new SpawnEntry(MonsterType.Slime, 12f));
+            d1.spawns.Add(new SpawnEntry(MonsterType.Vampire, 52f));
+            d1.spawns.Add(new SpawnEntry(MonsterType.Slime, 100f));
+            d1.spawns.Add(new SpawnEntry(MonsterType.Vampire, 142f));
             d1.goalCustomersServed = 4;
             d1.goalMinProfit = 1;
             d1.goalDescription = "完成 4 名顾客结账，且当日利润大于 0。";
@@ -310,6 +313,7 @@ namespace MonsterMart.Data
                 "月光牛奶一定要备够，银纸巧克力最好别摆在他会经过的货架上。\n" +
                 "顾客开始排队了，收银慢一点整条队伍都会掉耐心。";
             d2.businessSeconds = 260f;
+            d2.maxItemsPerCustomer = 2;
             d2.spawns.Add(new SpawnEntry(MonsterType.Slime, 5f));
             d2.spawns.Add(new SpawnEntry(MonsterType.Vampire, 28f));
             d2.spawns.Add(new SpawnEntry(MonsterType.Werewolf, 55f));
@@ -336,6 +340,7 @@ namespace MonsterMart.Data
                 "他检查四件事：有没有缺货、店里干不干净、禁忌商品有没有乱摆、顾客满不满意。\n" +
                 "把店撑住。";
             d3.businessSeconds = 320f;
+            d3.maxItemsPerCustomer = 3;
             d3.spawns.Add(new SpawnEntry(MonsterType.Slime, 4f));
             d3.spawns.Add(new SpawnEntry(MonsterType.Werewolf, 26f));
             d3.spawns.Add(new SpawnEntry(MonsterType.Ghost, 50f));

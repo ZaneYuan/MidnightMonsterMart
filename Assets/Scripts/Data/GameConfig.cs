@@ -40,8 +40,8 @@ namespace MonsterMart.Data
         public const float PatienceImpatientThreshold = 30f;
         public const float PatienceComplainThreshold = 1f;
 
-        /// <summary>缺货时顾客等待多久才放弃。</summary>
-        public const float OutOfStockWaitSeconds = 6f;
+        /// <summary>缺货时顾客等待多久才放弃（留出玩家跑一趟仓库的时间）。</summary>
+        public const float OutOfStockWaitSeconds = 14f;
 
         /// <summary>整洁度低于 50 时，所有顾客耐心衰减倍率（§6.3）。</summary>
         public const float DirtyStoreDecayMultiplier = 1.6f;
@@ -63,7 +63,7 @@ namespace MonsterMart.Data
         public const int QueuePointCount = 3;           // §9.3「收银台前设置 3 个排队点」
 
         // ---------- 店铺指标（设计文档 §6） ----------
-        public const int StartingMoney = 60;
+        public const int StartingMoney = 90;
         public const int StartingReputation = 30;
         public const float StartingCleanliness = 100f;
 

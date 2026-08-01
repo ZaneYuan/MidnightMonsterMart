@@ -28,6 +28,9 @@ namespace MonsterMart.UI
         Image _blackout;
         RectTransform _toastRoot;
 
+        RectTransform _prepBar;
+        Text _prepHint;
+
         readonly List<ToastEntry> _toasts = new List<ToastEntry>();
 
         class ToastEntry
@@ -50,7 +53,38 @@ namespace MonsterMart.UI
             BuildTopRight(root);
             BuildBottom(root);
             BuildHoldBar(root);
+            BuildPreparationBar(root);
             BuildToasts(root);
+        }
+
+        /// <summary>
+        /// 准备阶段的常驻工具条。关掉进货面板后可以自由走动摆货，
+        /// 摆完再从这里开门 —— 设计文档 §2.1「准备阶段没有时间限制」。
+        /// </summary>
+        void BuildPreparationBar(RectTransform root)
+        {
+            var box = UIFactory.Panel(root, UIFactory.PanelBg, "PrepBar");
+            UIFactory.Anchor(box.rectTransform, new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                             new Vector2(0, -70), new Vector2(920, 92));
+            _prepBar = box.rectTransform;
+
+            _prepHint = UIFactory.Label(box.transform,
+                "营业前准备：去仓库拿货，走到对应货架前长按 E 摆上去。没有时间限制。",
+                20, UIFactory.Ink, TextAnchor.MiddleLeft, "Hint");
+            UIFactory.Anchor(_prepHint.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f),
+                             new Vector2(268, 0), new Vector2(500, 60));
+
+            var buy = UIFactory.Button(box.transform, "进货界面 (B)",
+                () => Game.UI.ShowPreparation(), 20);
+            UIFactory.Anchor(buy.GetComponent<RectTransform>(), new Vector2(1, 0.5f), new Vector2(1, 0.5f),
+                             new Vector2(-290, 0), new Vector2(180, 56));
+
+            var open = UIFactory.Button(box.transform, "开始营业",
+                () => Game.UI.Preparation.TryBeginBusiness(), 22, new Color(0.30f, 0.52f, 0.34f));
+            UIFactory.Anchor(open.GetComponent<RectTransform>(), new Vector2(1, 0.5f), new Vector2(1, 0.5f),
+                             new Vector2(-110, 0), new Vector2(180, 56));
+
+            _prepBar.gameObject.SetActive(false);
         }
 
         void BuildTopLeft(RectTransform root)
@@ -173,7 +207,24 @@ namespace MonsterMart.UI
             UpdateStats();
             UpdateCarry();
             UpdatePrompt();
+            UpdatePreparationBar();
             UpdateToasts();
+        }
+
+        void UpdatePreparationBar()
+        {
+            if (_prepBar == null) return;
+
+            bool show = Game.Manager.State == GameState.Preparation &&
+                        Game.UI != null && !Game.UI.BlocksWorldInput;
+
+            if (_prepBar.gameObject.activeSelf != show) _prepBar.gameObject.SetActive(show);
+            if (!show) return;
+
+            int empty = Game.Store != null ? Game.Store.EmptyShelfCount() : 0;
+            _prepHint.text = empty > 0
+                ? $"营业前准备 · 还有 <color=#F26B61>{empty}</color> 个货架是空的（红标）\n去仓库拿货 → 走到对应货架前<b>长按 E</b>。没有时间限制。"
+                : "营业前准备 · 所有货架都有货了，可以开门了。";
         }
 
         void UpdateStats()
@@ -235,8 +286,17 @@ namespace MonsterMart.UI
             _carryIcon.enabled = true;
             _carryIcon.sprite = Art.SpriteFactory.ProductIcon(player.Carry.Product);
             _carryLabel.color = UIFactory.Ink;
-            _carryLabel.text = player.Carry.Packed
-                ? $"{player.Carry.Product.displayName} ×{player.Carry.Count}（已灵界处理）"
+
+            if (player.Carry.Packed)
+            {
+                _carryLabel.text = $"{player.Carry.Product.displayName} ×{player.Carry.Count}\n<size=15><color=#D89EFF>交给幽灵</color></size>";
+                return;
+            }
+
+            // 直接告诉玩家该往哪个货架送 —— 光有商品名很容易找错货架
+            var shelf = Game.Store != null ? Game.Store.FindShelf(player.Carry.Product) : null;
+            _carryLabel.text = shelf != null
+                ? $"{player.Carry.Product.displayName} ×{player.Carry.Count}\n<size=15><color=#FFD966>送到「{shelf.displayName}」</color></size>"
                 : $"{player.Carry.Product.displayName} ×{player.Carry.Count}";
         }
 

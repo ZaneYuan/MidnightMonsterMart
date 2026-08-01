@@ -27,6 +27,9 @@ namespace MonsterMart.Store
         Transform _iconRoot;
         readonly List<SpriteRenderer> _icons = new List<SpriteRenderer>();
         SpriteRenderer _emptyBadge;
+        SpriteRenderer _emptyBadgeIcon;
+        SpriteRenderer _highlight;
+        Transform _badgeRoot;
 
         public bool IsEmpty => count <= 0;
         public bool IsFull => count >= capacity;
@@ -59,13 +62,63 @@ namespace MonsterMart.Store
             iconRootGo.transform.SetParent(transform, false);
             _iconRoot = iconRootGo.transform;
 
+            // 手上拿着这个货架要的商品时，货架会闪黄框指路
+            var highlightGo = new GameObject("Highlight");
+            highlightGo.transform.SetParent(transform, false);
+            _highlight = highlightGo.AddComponent<SpriteRenderer>();
+            _highlight.sprite = SpriteFactory.Panel(new Color(1f, 0.85f, 0.35f), new Color(1f, 0.95f, 0.6f),
+                                                    cells.WidthCells, cells.HeightCells, 3);
+            _highlight.sortingOrder = SortingLayers.Fixture - 1;
+            _highlight.transform.localScale = new Vector3(1.12f, 1.22f, 1f);
+            _highlight.enabled = false;
+
+            // 空货架提示：贴着货架顶部，并显示「缺哪件商品」而不是一个光秃秃的红点
             var badgeGo = new GameObject("EmptyBadge");
             badgeGo.transform.SetParent(transform, false);
+            badgeGo.transform.localPosition = new Vector3(0f, cells.HeightCells * 0.5f + 0.18f, 0f);
+            _badgeRoot = badgeGo.transform;
+
             _emptyBadge = badgeGo.AddComponent<SpriteRenderer>();
-            _emptyBadge.sprite = SpriteFactory.Circle(new Color(0.9f, 0.2f, 0.2f, 0.9f), 20);
+            _emptyBadge.sprite = SpriteFactory.Circle(new Color(0.86f, 0.20f, 0.22f, 0.92f), 30);
             _emptyBadge.sortingOrder = SortingLayers.FixtureOverlay;
-            _emptyBadge.transform.localPosition = new Vector3(0f, cells.HeightCells * 0.5f + 0.35f, 0f);
             _emptyBadge.enabled = false;
+
+            var badgeIconGo = new GameObject("WantIcon");
+            badgeIconGo.transform.SetParent(badgeGo.transform, false);
+            badgeIconGo.transform.localScale = Vector3.one * 0.60f;
+            _emptyBadgeIcon = badgeIconGo.AddComponent<SpriteRenderer>();
+            _emptyBadgeIcon.sprite = SpriteFactory.ProductIcon(product);
+            _emptyBadgeIcon.sortingOrder = SortingLayers.FixtureOverlay + 1;
+            _emptyBadgeIcon.enabled = false;
+        }
+
+        void Update()
+        {
+            var player = Game.Player;
+
+            bool wanted =
+                player != null &&
+                !knockedOver &&
+                !IsFull &&
+                player.Carry.Has(product);
+
+            if (_highlight != null)
+            {
+                _highlight.enabled = wanted;
+                if (wanted)
+                {
+                    float pulse = 0.45f + 0.35f * Mathf.Sin(Time.time * 6f);
+                    _highlight.color = new Color(1f, 1f, 1f, pulse);
+                }
+            }
+
+            // 空货架红标轻微上下浮动，比静止的圆点更容易被注意到
+            if (_badgeRoot != null && _emptyBadge != null && _emptyBadge.enabled)
+            {
+                float bob = Mathf.Sin(Time.time * 3.2f) * 0.06f;
+                _badgeRoot.localPosition =
+                    new Vector3(0f, cells.HeightCells * 0.5f + 0.18f + bob, 0f);
+            }
         }
 
         Color BaseColor()
@@ -89,8 +142,9 @@ namespace MonsterMart.Store
                 _body.color = knockedOver ? new Color(0.7f, 0.6f, 0.6f) : Color.white;
             }
 
-            if (_emptyBadge != null)
-                _emptyBadge.enabled = IsEmpty && !knockedOver;
+            bool showBadge = IsEmpty && !knockedOver;
+            if (_emptyBadge != null) _emptyBadge.enabled = showBadge;
+            if (_emptyBadgeIcon != null) _emptyBadgeIcon.enabled = showBadge;
 
             if (_iconRoot == null || product == null) return;
 

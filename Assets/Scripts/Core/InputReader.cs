@@ -43,6 +43,9 @@ namespace MonsterMart.Core
         /// <summary>Esc：暂停菜单。</summary>
         public static bool PausePressed => Input.GetKeyDown(KeyCode.Escape);
 
+        /// <summary>B：营业前重新打开进货界面。</summary>
+        public static bool BuyMenuPressed => Input.GetKeyDown(KeyCode.B);
+
         /// <summary>鼠标左键按下（收银扫描、UI）。</summary>
         public static bool PrimaryPressed => Input.GetMouseButtonDown(0);
 
