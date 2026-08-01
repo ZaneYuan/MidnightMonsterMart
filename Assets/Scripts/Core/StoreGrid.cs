@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using MonsterMart.Data;
 
@@ -50,7 +50,7 @@ namespace MonsterMart.Core
             if (isFixture) _blockedByFixture[x, y] = blocked;
         }
 
-        public void SetBlockedRect(RectInt rect, bool blocked, bool isFixture = false)
+        public void SetBlockedRect(CellRect rect, bool blocked, bool isFixture = false)
         {
             for (int x = rect.xMin; x <= rect.xMax; x++)
                 for (int y = rect.yMin; y <= rect.yMax; y++)
@@ -107,7 +107,7 @@ namespace MonsterMart.Core
         }
 
         /// <summary>某个设施矩形周围所有可站立的格子。</summary>
-        public List<Vector2Int> AccessCells(RectInt rect)
+        public List<Vector2Int> AccessCells(CellRect rect)
         {
             var result = new List<Vector2Int>();
             for (int x = rect.xMin - 1; x <= rect.xMax + 1; x++)
@@ -131,12 +131,16 @@ namespace MonsterMart.Core
         }
     }
 
-    /// <summary>整数矩形（含边界）。避免依赖 UnityEngine.RectInt 的具体语义差异。</summary>
-    public struct RectInt
+    /// <summary>
+    /// 格子矩形（含边界）。刻意不叫 RectInt —— UnityEngine 里已有同名类型，
+    /// 同时 using 两个命名空间会产生 CS0104 歧义。
+    /// </summary>
+    [System.Serializable]
+    public struct CellRect
     {
         public int xMin, yMin, xMax, yMax;
 
-        public RectInt(int xMin, int yMin, int xMax, int yMax)
+        public CellRect(int xMin, int yMin, int xMax, int yMax)
         {
             this.xMin = xMin;
             this.yMin = yMin;
@@ -144,7 +148,7 @@ namespace MonsterMart.Core
             this.yMax = yMax;
         }
 
-        public static RectInt Single(int x, int y) => new RectInt(x, y, x, y);
+        public static CellRect Single(int x, int y) => new CellRect(x, y, x, y);
 
         public int WidthCells => xMax - xMin + 1;
         public int HeightCells => yMax - yMin + 1;

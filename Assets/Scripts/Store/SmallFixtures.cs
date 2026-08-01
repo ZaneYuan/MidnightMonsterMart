@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MonsterMart.Art;
 using MonsterMart.Core;
 using MonsterMart.Data;
@@ -57,7 +57,7 @@ namespace MonsterMart.Store
         public enum MirrorState { Exposed, Covered, Removed }
 
         public MirrorState State { get; private set; } = MirrorState.Exposed;
-        public RectInt cells;
+        public CellRect cells;
 
         SpriteRenderer _renderer;
 
@@ -67,7 +67,7 @@ namespace MonsterMart.Store
         /// <summary>保留镜子时，普通顾客获得满意度加成。</summary>
         public bool GivesDecorBonus => State == MirrorState.Exposed;
 
-        public void Configure(RectInt rect)
+        public void Configure(CellRect rect)
         {
             cells = rect;
             transform.position = rect.CenterWorld;
@@ -133,9 +133,9 @@ namespace MonsterMart.Store
     /// <summary>垃圾桶 — 丢弃手上拿错的商品（按进货价的一半折损）。</summary>
     public class TrashBin : Interactable
     {
-        public RectInt cells;
+        public CellRect cells;
 
-        public void Configure(RectInt rect)
+        public void Configure(CellRect rect)
         {
             cells = rect;
             transform.position = rect.CenterWorld;
@@ -172,14 +172,14 @@ namespace MonsterMart.Store
     /// </summary>
     public class SpiritPackingStation : Interactable
     {
-        public RectInt cells;
+        public CellRect cells;
 
         /// <summary>已处理完、等待交付的商品。</summary>
         public ProductData PackedProduct { get; private set; }
 
         SpriteRenderer _glow;
 
-        public void Configure(RectInt rect)
+        public void Configure(CellRect rect)
         {
             cells = rect;
             transform.position = rect.CenterWorld;

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using MonsterMart.Art;
 using MonsterMart.Core;
@@ -137,20 +137,20 @@ namespace MonsterMart.Store
 
             // ---- 货架（设计文档 §9.1）----
             // 左侧普通货架
-            AddShelf("black_garlic_bread", FixtureKind.Shelf, new RectInt(4, 7, 6, 7), "左侧货架 · 食品");
-            AddShelf("silver_chocolate", FixtureKind.Shelf, new RectInt(4, 10, 6, 10), "左侧货架 · 零食");
+            AddShelf("black_garlic_bread", FixtureKind.Shelf, new CellRect(4, 7, 6, 7), "左侧货架 · 食品");
+            AddShelf("silver_chocolate", FixtureKind.Shelf, new CellRect(4, 10, 6, 10), "左侧货架 · 零食");
             // 中间零食货架
-            AddShelf("soul_mint", FixtureKind.Shelf, new RectInt(10, 7, 12, 7), "中间货架 · 零食");
-            AddShelf("glow_jelly", FixtureKind.Shelf, new RectInt(10, 10, 12, 10), "中间货架 · 零食");
+            AddShelf("soul_mint", FixtureKind.Shelf, new CellRect(10, 7, 12, 7), "中间货架 · 零食");
+            AddShelf("glow_jelly", FixtureKind.Shelf, new CellRect(10, 10, 12, 10), "中间货架 · 零食");
             // 右侧饮料冰柜（两个格位）
-            AddShelf("blood_orange_soda", FixtureKind.Cooler, new RectInt(19, 6, 20, 7), "饮料冰柜 · 上层");
-            AddShelf("moonlight_milk", FixtureKind.Cooler, new RectInt(19, 10, 20, 11), "饮料冰柜 · 下层");
+            AddShelf("blood_orange_soda", FixtureKind.Cooler, new CellRect(19, 6, 20, 7), "饮料冰柜 · 上层");
+            AddShelf("moonlight_milk", FixtureKind.Cooler, new CellRect(19, 10, 20, 11), "饮料冰柜 · 下层");
             // 右后方工具架（两个格位）
-            AddShelf("warding_salt", FixtureKind.ToolRack, new RectInt(15, 13, 16, 13), "工具架 · 左");
-            AddShelf("all_purpose_cleaner", FixtureKind.ToolRack, new RectInt(17, 13, 18, 13), "工具架 · 右");
+            AddShelf("warding_salt", FixtureKind.ToolRack, new CellRect(15, 13, 16, 13), "工具架 · 左");
+            AddShelf("all_purpose_cleaner", FixtureKind.ToolRack, new CellRect(17, 13, 18, 13), "工具架 · 右");
 
             // ---- 收银台 + 3 个排队点（§9.3）----
-            var checkoutRect = new RectInt(5, 4, 7, 4);
+            var checkoutRect = new CellRect(5, 4, 7, 4);
             var queuePoints = new List<Vector2Int>
             {
                 new Vector2Int(6, 3),
@@ -162,30 +162,30 @@ namespace MonsterMart.Store
             BlockRect(checkoutRect);
 
             // ---- 后方仓库门 ----
-            var stockRect = new RectInt(10, 13, 11, 13);
+            var stockRect = new CellRect(10, 13, 11, 13);
             StockRoom = CreateFixture<StockRoom>("StockRoom", stockRect);
             StockRoom.Configure(stockRect);
             BlockRect(stockRect);
 
             // ---- 左后方灵界包装台 ----
-            var spiritRect = new RectInt(3, 13, 4, 13);
+            var spiritRect = new CellRect(3, 13, 4, 13);
             SpiritStation = CreateFixture<SpiritPackingStation>("SpiritPackingStation", spiritRect);
             SpiritStation.Configure(spiritRect);
             BlockRect(spiritRect);
 
             // ---- 墙面镜子（不阻挡通行，只是装饰）----
-            var mirrorRect = new RectInt(21, 5, 21, 6);
+            var mirrorRect = new CellRect(21, 5, 21, 6);
             Mirror = CreateFixture<Mirror>("Mirror", mirrorRect);
             Mirror.Configure(mirrorRect);
 
             // ---- 垃圾桶 ----
-            var trashRect = new RectInt(2, 2, 2, 2);
+            var trashRect = new CellRect(2, 2, 2, 2);
             TrashBin = CreateFixture<TrashBin>("TrashBin", trashRect);
             TrashBin.Configure(trashRect);
             BlockRect(trashRect);
         }
 
-        void AddShelf(string productId, FixtureKind kind, RectInt rect, string label)
+        void AddShelf(string productId, FixtureKind kind, CellRect rect, string label)
         {
             var product = GameDatabase.GetProduct(productId);
             if (product == null)
@@ -200,7 +200,7 @@ namespace MonsterMart.Store
             Shelves.Add(shelf);
         }
 
-        T CreateFixture<T>(string name, RectInt rect) where T : Component
+        T CreateFixture<T>(string name, CellRect rect) where T : Component
         {
             var go = new GameObject(name);
             go.transform.SetParent(_fixtureRoot, false);
@@ -208,7 +208,7 @@ namespace MonsterMart.Store
             return go.AddComponent<T>();
         }
 
-        void BlockRect(RectInt rect) => Grid.SetBlockedRect(rect, true, true);
+        void BlockRect(CellRect rect) => Grid.SetBlockedRect(rect, true, true);
 
         // ------------------------------------------------------------------
         // 查询
@@ -258,7 +258,7 @@ namespace MonsterMart.Store
         }
 
         /// <summary>设施旁边、离参考点最近的可站立格。</summary>
-        public Vector2Int AccessCellNear(RectInt rect, Vector2 from)
+        public Vector2Int AccessCellNear(CellRect rect, Vector2 from)
         {
             var options = Grid.AccessCells(rect);
             if (options.Count == 0) return Grid.NearestWalkable(new Vector2Int(rect.xMin, rect.yMin));

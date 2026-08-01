@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using MonsterMart.Art;
 using MonsterMart.Core;
 using MonsterMart.Data;
@@ -12,9 +12,9 @@ namespace MonsterMart.Store
     /// </summary>
     public class StockRoom : Interactable
     {
-        public RectInt cells;
+        public CellRect cells;
 
-        public void Configure(RectInt rect)
+        public void Configure(CellRect rect)
         {
             cells = rect;
             transform.position = rect.CenterWorld;

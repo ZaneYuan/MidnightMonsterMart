@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using MonsterMart.Art;
 using MonsterMart.Core;
@@ -17,7 +17,7 @@ namespace MonsterMart.Store
         public int count;
         public int capacity = GameConfig.ShelfCapacity;
         public FixtureKind kind = FixtureKind.Shelf;
-        public RectInt cells;
+        public CellRect cells;
         public string displayName;
 
         /// <summary>被狼人撞倒 — 设计文档 §7 事件二。</summary>
@@ -34,7 +34,7 @@ namespace MonsterMart.Store
 
         public override Vector2 InteractAnchor => cells.CenterWorld;
 
-        public void Configure(ProductData assignedProduct, FixtureKind fixtureKind, RectInt rect, string label)
+        public void Configure(ProductData assignedProduct, FixtureKind fixtureKind, CellRect rect, string label)
         {
             product = assignedProduct;
             kind = fixtureKind;

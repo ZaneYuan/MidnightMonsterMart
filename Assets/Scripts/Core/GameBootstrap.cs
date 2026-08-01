@@ -98,11 +98,25 @@ namespace MonsterMart.Core
 
         void BuildCamera(Transform parent)
         {
-            _cameraObject = new GameObject("MainCamera");
+            // 场景里可能已经有摄像机（Unity 新建场景自带 Main Camera + Directional Light）。
+            // 只关掉 Camera 组件本身，不动 GameObject —— 否则会连它身上的
+            // AudioListener 一起关掉，导致整个游戏没有声音。
+            var existing = FindObjectsByType<Camera>(FindObjectsInactive.Include);
+            for (int i = 0; i < existing.Length; i++)
+            {
+                if (existing[i] == null) continue;
+                existing[i].enabled = false;
+            }
+
+            _cameraObject = new GameObject("GameCamera");
             _cameraObject.transform.SetParent(parent, false);
-            _cameraObject.tag = "MainCamera";
 
             var camera = _cameraObject.AddComponent<Camera>();
+
+            // 场景里没有 AudioListener 时（比如空的 Boot 场景）补一个
+            if (FindAnyObjectByType<AudioListener>() == null)
+                _cameraObject.AddComponent<AudioListener>();
+
             _cameraRig = _cameraObject.AddComponent<CameraRig>();
             _cameraRig.Initialize(camera, null);
         }

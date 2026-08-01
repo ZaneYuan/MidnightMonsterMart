@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using MonsterMart.Art;
 using MonsterMart.Core;
@@ -14,7 +14,7 @@ namespace MonsterMart.Store
     /// </summary>
     public class Checkout : Interactable
     {
-        public RectInt cells;
+        public CellRect cells;
 
         /// <summary>收银台等级：0 = 初级，1 = 升级（文档 §5.2）。</summary>
         public int Level { get; private set; }
@@ -38,7 +38,7 @@ namespace MonsterMart.Store
 
         SpriteRenderer _scannerLight;
 
-        public void Configure(RectInt rect, IEnumerable<Vector2Int> queuePoints)
+        public void Configure(CellRect rect, IEnumerable<Vector2Int> queuePoints)
         {
             cells = rect;
             transform.position = rect.CenterWorld;
