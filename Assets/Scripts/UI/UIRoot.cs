@@ -42,6 +42,10 @@ namespace MonsterMart.UI
     {
         public Canvas Canvas { get; private set; }
         public HudView Hud { get; private set; }
+
+        /// <summary>晨间需求与排班 — 设计文档 §2.1 阶段一。</summary>
+        public MorningBriefView MorningBrief { get; private set; }
+
         public PreparationView Preparation { get; private set; }
         public StockRoomView StockRoomPicker { get; private set; }
         public CheckoutView CheckoutPanel { get; private set; }
@@ -50,6 +54,12 @@ namespace MonsterMart.UI
         public PauseView Pause { get; private set; }
         public BestiaryView Bestiary { get; private set; }
         public ChoiceDialog Choice { get; private set; }
+
+        /// <summary>远征抬头信息 — 设计文档 §12.2。</summary>
+        public ExpeditionView Expedition { get; private set; }
+
+        /// <summary>远征队员信息面板 —— 攻击力/物理/魔法/技能/HP/MP/经验/等级一次看全。</summary>
+        public SquadInfoView SquadInfo { get; private set; }
 
         readonly List<UIPanel> _panels = new List<UIPanel>();
 
@@ -70,6 +80,7 @@ namespace MonsterMart.UI
             BuildEventSystem();
 
             Hud = CreateView<HudView>("HUD");
+            MorningBrief = CreateView<MorningBriefView>("MorningBriefView");
             Preparation = CreateView<PreparationView>("PreparationView");
             StockRoomPicker = CreateView<StockRoomView>("StockRoomView");
             CheckoutPanel = CreateView<CheckoutView>("CheckoutView");
@@ -78,8 +89,11 @@ namespace MonsterMart.UI
             Pause = CreateView<PauseView>("PauseView");
             Bestiary = CreateView<BestiaryView>("BestiaryView");
             Choice = CreateView<ChoiceDialog>("ChoiceDialog");
+            Expedition = CreateView<ExpeditionView>("ExpeditionView");
+            SquadInfo = CreateView<SquadInfoView>("SquadInfoView");
 
             Hud.BuildUI(Canvas.transform);
+            MorningBrief.BuildUI(Canvas.transform);
             Preparation.BuildUI(Canvas.transform);
             StockRoomPicker.BuildUI(Canvas.transform);
             CheckoutPanel.BuildUI(Canvas.transform);
@@ -88,7 +102,10 @@ namespace MonsterMart.UI
             Pause.BuildUI(Canvas.transform);
             Bestiary.BuildUI(Canvas.transform);
             Choice.BuildUI(Canvas.transform);
+            Expedition.BuildUI(Canvas.transform);
+            SquadInfo.BuildUI(Canvas.transform);
 
+            _panels.Add(MorningBrief);
             _panels.Add(Preparation);
             _panels.Add(StockRoomPicker);
             _panels.Add(CheckoutPanel);
@@ -97,6 +114,8 @@ namespace MonsterMart.UI
             _panels.Add(Pause);
             _panels.Add(Bestiary);
             _panels.Add(Choice);
+            _panels.Add(Expedition);
+            _panels.Add(SquadInfo);
 
             for (int i = 0; i < _panels.Count; i++) _panels[i].Close();
         }
@@ -139,6 +158,9 @@ namespace MonsterMart.UI
         // ------------------------------------------------------------------
         // 面板控制
         // ------------------------------------------------------------------
+        public void ShowMorningBrief() => MorningBrief.OpenFor();
+        public void CloseMorningBrief() => MorningBrief.Close();
+
         public void ShowPreparation() => Preparation.OpenFor(Game.Day.CurrentPlan);
         public void ClosePreparation() => Preparation.Close();
 
@@ -148,6 +170,15 @@ namespace MonsterMart.UI
             => CheckoutPanel.OpenSession(checkout, customer);
 
         public void CloseCheckout() => CheckoutPanel.Close();
+
+        public void ShowExpedition() => Expedition.Open();
+        public void CloseExpedition() => Expedition.Close();
+
+        public void ToggleSquadInfo()
+        {
+            if (SquadInfo.IsOpen) SquadInfo.Close();
+            else SquadInfo.Open();
+        }
 
         public void ShowSettlement(DaySummary summary) => Settlement.OpenFor(summary);
 

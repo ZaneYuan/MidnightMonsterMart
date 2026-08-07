@@ -170,7 +170,10 @@ namespace MonsterMart.Customers
             float dt = Time.deltaTime;
             _stateTimer += dt;
 
-            if (State != CustomerState.Leaving && State != CustomerState.CheckingOut)
+            // 已经在往门口走的人（Leaving / Angry）不再掉耐心，
+            // 否则还会继续触发「店里太脏」那条随机离店判定。
+            if (State != CustomerState.Leaving && State != CustomerState.Angry &&
+                State != CustomerState.CheckingOut)
                 TickPatience(dt);
 
             Behaviour?.OnUpdate(this);
@@ -501,7 +504,13 @@ namespace MonsterMart.Customers
         /// <summary>顾客生气离店 — 设计文档 §6.2。</summary>
         public void LeaveAngry(string reason)
         {
-            if (State == CustomerState.Leaving) return;
+            // Angry 和 Leaving 一样是终态（ForceLeave 也是这么判的）。
+            // 只挡 Leaving 的话会重复结算：顾客先因为「店里太脏」/「缺货」/「收银太慢」
+            // 在耐心还没归零时变成 Angry，之后耐心继续掉到 0，
+            // ApplyPatience 又会再调一次 LeaveAngry("等太久了") ——
+            // 声望被扣两次 -6，LeftAngry 也记成两个人。
+            // 而 LeftAngry 正是第三天检查员「服务事故」那一项的输入。
+            if (State == CustomerState.Leaving || State == CustomerState.Angry) return;
 
             LeftAngry = true;
             Satisfaction = Mathf.Min(Satisfaction, 15f);
@@ -616,7 +625,13 @@ namespace MonsterMart.Customers
             if (State == CustomerState.Leaving) return false;
 
             if (PendingSpiritProduct != null)
-                return player.Carry.Packed && player.Carry.Product == PendingSpiritProduct;
+            {
+                if (player.Carry.Packed && player.Carry.Product == PendingSpiritProduct) return true;
+
+                // 商品还没在灵界包装台处理过，不能交付 —— 但玩家带着对的商品走过来时
+                // 至少要有反应，否则「靠近也没用」会被当成卡关的 bug（见灵魂薄荷糖那次反馈）。
+                return player.Carry.Product == PendingSpiritProduct;
+            }
 
             if (AmnesiaActive) return true;
             if (WanderOnly) return true;
@@ -626,7 +641,10 @@ namespace MonsterMart.Customers
 
         public override string GetPrompt(PlayerController player)
         {
-            if (PendingSpiritProduct != null) return $"[E] 交给 {Data.displayName}";
+            if (PendingSpiritProduct != null)
+                return player.Carry.Packed
+                    ? $"[E] 交给 {Data.displayName}"
+                    : "这件还没处理 —— 先送到灵界包装台";
             if (AmnesiaActive) return "[E] 帮它回忆要买什么";
             if (WanderOnly) return "[E] 把小史莱姆赶回去";
             return "[E] 与顾客交谈";
@@ -636,6 +654,14 @@ namespace MonsterMart.Customers
         {
             if (PendingSpiritProduct != null)
             {
+                if (!player.Carry.Packed)
+                {
+                    Game.UI?.Hud?.Flash(
+                        $"{PendingSpiritProduct.displayName} 得先送到灵界包装台处理，才能交给 {Data.displayName}");
+                    Game.Audio?.PlayError();
+                    return;
+                }
+
                 var product = player.Carry.Product;
                 player.Carry.Remove(1);
                 ReceivePackedProduct(product);

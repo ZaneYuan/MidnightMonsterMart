@@ -283,20 +283,49 @@ namespace MonsterMart.UI
         }
 
         // ------------------------------------------------------------------
+        /// <summary>收银会话只在营业中推进。</summary>
+        static bool SessionTicks =>
+            Game.Manager != null && Game.Manager.State == GameState.Open;
+
+        /// <summary>
+        /// 推进一帧收银会话的模拟部分（累计耗时 + 扣当前顾客和队列的耐心），
+        /// 不碰任何 UI 控件；返回累计后的会话时长，没推进时原样返回。
+        ///
+        /// 会看游戏状态，是因为 CheckoutView 的 Esc 关不掉
+        /// （CanCloseWithEscape = false），暂停时它会留在屏幕上。不看状态的话，
+        /// 玩家人在暂停菜单里，收银耗时照样累计、当前顾客和整条队伍照样掉耐心，
+        /// 掉到 0 还会愤怒离店 —— 声望 -6、LeftAngry +1 全在暂停期间发生，
+        /// 而 LeftAngry 正是第三天检查员「服务事故」那一项的输入。
+        ///
+        /// 抽成静态、只吃参数，是为了能无头验证这条闸门（Update 里那些控件
+        /// 没建过 UI 就会空引用）。
+        /// </summary>
+        public static float AdvanceSession(Checkout checkout, CustomerController customer,
+                                           float sessionTime, float dt)
+        {
+            if (checkout == null || customer == null) return sessionTime;
+            if (!SessionTicks) return sessionTime;
+
+            sessionTime += dt;
+
+            // 扫描速度太慢 → 顾客耐心下降（文档 §5.1）
+            float drain = (1.2f + sessionTime * 0.08f) * checkout.QueuePatienceMultiplier;
+            customer.ApplyPatience(-drain * dt);
+
+            // 队伍里其他人也在掉耐心
+            var queue = checkout.Queue;
+            for (int i = 1; i < queue.Count; i++)
+                queue[i]?.ApplyPatience(-0.4f * dt);
+
+            return sessionTime;
+        }
+
         void Update()
         {
             if (!IsOpen || _customer == null) return;
+            if (!SessionTicks) return;   // 暂停 / 结算时整个收银界面冻住
 
-            _sessionTime += Time.deltaTime;
-
-            // 扫描速度太慢 → 顾客耐心下降（文档 §5.1）
-            float drain = (1.2f + _sessionTime * 0.08f) * _checkout.QueuePatienceMultiplier;
-            _customer.ApplyPatience(-drain * Time.deltaTime);
-
-            // 队伍里其他人也在掉耐心
-            var queue = _checkout.Queue;
-            for (int i = 1; i < queue.Count; i++)
-                queue[i]?.ApplyPatience(-0.4f * Time.deltaTime);
+            _sessionTime = AdvanceSession(_checkout, _customer, _sessionTime, Time.deltaTime);
 
             _patienceBar.fillAmount = _customer.PatienceNormalized;
             _patienceBar.color = _customer.PatienceNormalized > 0.6f ? UIFactory.Good

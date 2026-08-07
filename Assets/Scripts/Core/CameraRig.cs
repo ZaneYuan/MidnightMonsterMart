@@ -19,6 +19,21 @@ namespace MonsterMart.Core
         Camera _camera;
         Vector3 _current;
 
+        // 跟随边界。默认是便利店；远征时切到房间那一块（房间在世界坐标里有偏移）。
+        Vector2 _boundsMin = Vector2.zero;
+        Vector2 _boundsMax = new Vector2(GameConfig.GridWidth, GameConfig.GridHeight);
+
+        public void SetBounds(Vector2 min, Vector2 max)
+        {
+            _boundsMin = min;
+            _boundsMax = max;
+            _current = Clamp(target != null ? target.position : CenterOfBounds());
+            ApplyPosition(_current);
+        }
+
+        public void ResetBoundsToStore()
+            => SetBounds(Vector2.zero, new Vector2(GameConfig.GridWidth, GameConfig.GridHeight));
+
         public void Initialize(Camera cam, Transform followTarget)
         {
             _camera = cam;
@@ -31,7 +46,7 @@ namespace MonsterMart.Core
             _camera.nearClipPlane = -20f;
             _camera.farClipPlane = 20f;
 
-            _current = Clamp(target != null ? target.position : StoreCenter());
+            _current = Clamp(target != null ? target.position : CenterOfBounds());
             ApplyPosition(_current);
         }
 
@@ -39,7 +54,7 @@ namespace MonsterMart.Core
         {
             if (_camera == null) return;
 
-            Vector3 desired = target != null ? target.position : StoreCenter();
+            Vector3 desired = target != null ? target.position : CenterOfBounds();
             desired = Clamp(desired);
 
             float t = 1f - Mathf.Exp(-smoothing * Time.deltaTime);
@@ -49,22 +64,25 @@ namespace MonsterMart.Core
 
         void ApplyPosition(Vector3 p) => transform.position = new Vector3(p.x, p.y, -10f);
 
-        static Vector3 StoreCenter()
-            => new Vector3(GameConfig.GridWidth * 0.5f, GameConfig.GridHeight * 0.5f, 0f);
+        Vector3 CenterOfBounds()
+            => new Vector3((_boundsMin.x + _boundsMax.x) * 0.5f,
+                           (_boundsMin.y + _boundsMax.y) * 0.5f, 0f);
 
         Vector3 Clamp(Vector3 p)
         {
             float halfH = _camera.orthographicSize;
             float halfW = halfH * Mathf.Max(0.1f, (float)Screen.width / Mathf.Max(1, Screen.height));
 
-            float minX = halfW;
-            float maxX = GameConfig.GridWidth - halfW;
-            float minY = halfH;
-            float maxY = GameConfig.GridHeight - halfH;
+            float minX = _boundsMin.x + halfW;
+            float maxX = _boundsMax.x - halfW;
+            float minY = _boundsMin.y + halfH;
+            float maxY = _boundsMax.y - halfH;
 
-            // 视野比店还大时直接居中
-            float x = minX > maxX ? GameConfig.GridWidth * 0.5f : Mathf.Clamp(p.x, minX, maxX);
-            float y = minY > maxY ? GameConfig.GridHeight * 0.5f : Mathf.Clamp(p.y, minY, maxY);
+            var center = CenterOfBounds();
+
+            // 视野比场景还大时直接居中
+            float x = minX > maxX ? center.x : Mathf.Clamp(p.x, minX, maxX);
+            float y = minY > maxY ? center.y : Mathf.Clamp(p.y, minY, maxY);
 
             return new Vector3(x, y, 0f);
         }

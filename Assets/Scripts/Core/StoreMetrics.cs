@@ -92,6 +92,17 @@ namespace MonsterMart.Core
             Money = Mathf.Max(0, value);
             OnChanged?.Invoke();
         }
+
+        /// <summary>
+        /// 远征打怪掉的金币 —— 直接进现金，但不计入 <see cref="DaySalesRevenue"/>：
+        /// 那一栏是给「今晚营业卖了多少钱」看的，混进远征收入会看不清营业本身的表现。
+        /// </summary>
+        public void AddExpeditionCoins(int amount)
+        {
+            if (amount <= 0) return;
+            Money += amount;
+            OnChanged?.Invoke();
+        }
     }
 
     /// <summary>店铺声望 0~100 — 设计文档 §6.2。</summary>

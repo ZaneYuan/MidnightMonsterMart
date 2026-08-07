@@ -62,6 +62,24 @@ namespace MonsterMart.Data
         public const int DoubleScanSatisfactionPenalty = 12;
         public const int QueuePointCount = 3;           // §9.3「收银台前设置 3 个排队点」
 
+        // ---------- 怪物员工岗位（设计文档 §4.3 / §4.4） ----------
+        // 每一项都是「排了这个岗才有」的收益，代价是那个人今天不能出征。
+
+        /// <summary>收银岗：扫描判定区加宽的比例（乘以岗位效率）。</summary>
+        public const float CashierScanBonus = 0.5f;
+
+        /// <summary>收银岗：排队掉耐心减免的比例（乘以岗位效率）。</summary>
+        public const float CashierQueueRelief = 0.45f;
+
+        /// <summary>补货岗：精神饱满时每隔几秒往货架搬一次。</summary>
+        public const float StaffRestockSeconds = 4.0f;
+
+        /// <summary>补货岗：一次搬几件。</summary>
+        public const int StaffRestockBatch = 2;
+
+        /// <summary>安保岗：拦下一次货架事故的概率（乘以岗位效率）。</summary>
+        public const float SecurityBlockChance = 0.75f;
+
         // ---------- 店铺指标（设计文档 §6） ----------
         public const int StartingMoney = 90;
         public const int StartingReputation = 30;

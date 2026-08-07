@@ -39,6 +39,7 @@ namespace MonsterMart.Events
         {
             _running = false;
             SetBlackout(false);
+            ResolvePendingInspection();
         }
 
         void Update()
@@ -159,10 +160,30 @@ namespace MonsterMart.Events
         // ------------------------------------------------------------------
         // 事件二：狼人撞倒货架
         // ------------------------------------------------------------------
+        /// <summary>
+        /// 安保岗拦下一次货架事故的概率 — 设计文档 §4.3
+        /// 「安保：处理偷窃、争吵和危险顾客」。
+        /// 没排安保就是 0；排了的话概率随疲劳打折（§4.4）。
+        /// </summary>
+        public static float SecurityBlockChance =>
+            GameConfig.SecurityBlockChance * StaffRoster.EfficiencyOn(StaffAssignment.Security);
+
         public void TriggerShelfCrash(CustomerController werewolf)
         {
             var store = Game.Store;
             if (store == null || werewolf == null) return;
+
+            // 排了安保岗就有机会在狼人动手之前把它拦下来。
+            // 这是「把强力员工留在店里」唯一能对抗第二天目标
+            //（不让狼人撞倒超过 1 个货架）的手段。
+            if (Random.value < SecurityBlockChance)
+            {
+                var guard = StaffRoster.FirstOn(StaffAssignment.Security);
+                string name = guard != null && guard.Data != null ? guard.Data.displayName : "安保";
+                Game.UI?.Hud?.Flash($"{name} 拦住了狼人，货架没倒");
+                werewolf.ApplyPatience(-4f);   // 被拦下来当然不高兴
+                return;
+            }
 
             // 找离狼人最近、还没倒的货架
             Store.Shelf nearest = null;
@@ -315,7 +336,14 @@ namespace MonsterMart.Events
         // ------------------------------------------------------------------
         // 事件五：神秘检查员（第三天固定，作为原型结局）
         // ------------------------------------------------------------------
-        public void RunInspection(CustomerController inspector)
+        public void RunInspection(CustomerController inspector) => RunInspection(inspector, true);
+
+        /// <summary>
+        /// <paramref name="announce"/> = false 时不弹检查结果对话框，只在 HUD 上闪一行。
+        /// 营业时间到、检查员还没结账的情况走这条路 —— 那时结算界面马上就要弹出来，
+        /// 再叠一个对话框会被盖住，评级本身已经写进当日结算摘要里了。
+        /// </summary>
+        public void RunInspection(CustomerController inspector, bool announce)
         {
             var store = Game.Store;
             var day = Game.Day;
@@ -374,12 +402,47 @@ namespace MonsterMart.Events
                 grade == InspectionGrade.C ? "「问题不少，我会记录在案。」" :
                                              "「停业整改。」";
 
-            Game.UI.ShowChoice(
-                $"检查结果：{grade}",
-                string.Join("\n", lines) + "\n\n" + verdict,
-                new ChoiceOption("我知道了", $"声望 {(repDelta >= 0 ? "+" : "")}{repDelta}", () => { }));
+            if (announce)
+            {
+                Game.UI.ShowChoice(
+                    $"检查结果：{grade}",
+                    string.Join("\n", lines) + "\n\n" + verdict,
+                    new ChoiceOption("我知道了", $"声望 {(repDelta >= 0 ? "+" : "")}{repDelta}", () => { }));
+            }
+            else
+            {
+                Game.UI?.Hud?.Flash($"检查员在离店前给出了评价：{grade}（声望 {(repDelta >= 0 ? "+" : "")}{repDelta}）");
+            }
 
             Game.Audio?.PlayHappy();
+        }
+
+        /// <summary>
+        /// 营业时间一到，GameManager.CloseStore() 会在同一帧就建好结算摘要，
+        /// 但检查员是走到门口才触发 InspectorBehaviour.OnLeaveStore 的 —— 那要好几秒。
+        /// 结果：结算界面显示「检查员评价：未完成 ✗」、声望快照少算了检查加减分，
+        /// 几秒后 RunInspection 才把评级写进 Game.Day，而结局判定读的是那个新值，
+        /// 于是结算界面和结局互相矛盾，第三天的目标也永远判为未达成。
+        ///
+        /// CloseStore() 里 EndDay() 排在 EnterSettlement() 之前，所以在这里把
+        /// 还没出结果的检查先结算掉，摘要和结局就都读得到同一个评级。
+        /// </summary>
+        void ResolvePendingInspection()
+        {
+            var day = Game.Day;
+            if (day == null || day.InspectionDone) return;
+            if (day.CurrentPlan == null || !day.CurrentPlan.spawnInspector) return;
+
+            var all = CustomerRegistry.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var c = all[i];
+                if (c == null || c.Data == null) continue;
+                if (c.Data.monsterType != MonsterType.Inspector) continue;
+
+                RunInspection(c, false);
+                return;
+            }
         }
 
         // ------------------------------------------------------------------

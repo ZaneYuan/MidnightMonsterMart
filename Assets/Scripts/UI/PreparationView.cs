@@ -7,10 +7,26 @@ using MonsterMart.Data;
 
 namespace MonsterMart.UI
 {
-    /// <summary>营业前界面 — 设计文档 §10.2 与 §2.1 阶段一。</summary>
+    /// <summary>
+    /// 进货界面 — 设计文档 §10.2 与 §2.1 阶段一。
+    ///
+    /// 用户反馈明确要求「即便开始营业了也可以打开商店进行补货，随时可以补货」——
+    /// 以前这个面板只在闭店准备阶段能打开，营业开始后 B 键就失效了。现在营业中
+    /// 也能随时调出来临时加购，靠 <see cref="DuringBusiness"/> 区分两种场景：
+    /// 「开始营业」按钮只在营业前有意义，营业中打开就该隐藏掉，防止误触发
+    /// 第二次 BeginBusiness（那会把营业计时器和随机事件重新初始化一遍）。
+    /// </summary>
     public class PreparationView : UIPanel
     {
-        public override bool CanCloseWithEscape => false;
+        // 营业前不许 Esc 关（那时候没有时间压力，防止手滑关掉又要重开一次）；
+        // 营业中打开的是「随时补货」这个副屏操作，Esc 该能随手关掉。
+        public override bool CanCloseWithEscape => DuringBusiness;
+
+        /// <summary>这次是不是在营业中打开的（而不是闭店准备阶段）。</summary>
+        public bool DuringBusiness => Game.Manager != null && Game.Manager.State == GameState.Open;
+
+        /// <summary>「开始营业」按钮当前是否显示 —— 给回归用例验证营业中它有没有让位。</summary>
+        public bool StartButtonVisible => _startButton != null && _startButton.gameObject.activeSelf;
 
         Text _title;
         Text _briefing;
@@ -24,6 +40,11 @@ namespace MonsterMart.UI
         Text _upgradeLabel;
         Button _autoStockButton;
         Text _autoStockLabel;
+        Text _expeditionStatus;
+
+        Button _startButton;
+        Button _closeButton;
+        Text _closeLabel;
 
         readonly List<ProductRow> _rows = new List<ProductRow>();
         readonly List<Text> _previewRows = new List<Text>();
@@ -280,9 +301,9 @@ namespace MonsterMart.UI
 
         void BuildFooter(Transform window)
         {
-            var start = UIFactory.Button(window, "开始营业", TryBeginBusiness,
-                                         25, new Color(0.30f, 0.52f, 0.34f));
-            UIFactory.Anchor(start.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
+            _startButton = UIFactory.Button(window, "开始营业", TryBeginBusiness,
+                                            25, new Color(0.30f, 0.52f, 0.34f));
+            UIFactory.Anchor(_startButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-150, 62), new Vector2(220, 56));
 
             // 一键摆货：准备阶段没有时间压力，来回搬运只是重复劳动
@@ -293,10 +314,11 @@ namespace MonsterMart.UI
                              new Vector2(-400, 62), new Vector2(250, 56));
             _autoStockLabel = _autoStockButton.GetComponentInChildren<Text>();
 
-            var stock = UIFactory.Button(window, "自己去店里摆", Close, 21,
-                                         new Color(0.28f, 0.38f, 0.55f));
-            UIFactory.Anchor(stock.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
+            _closeButton = UIFactory.Button(window, "自己去店里摆", Close, 21,
+                                            new Color(0.28f, 0.38f, 0.55f));
+            UIFactory.Anchor(_closeButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-670, 62), new Vector2(250, 56));
+            _closeLabel = _closeButton.GetComponentInChildren<Text>();
 
             var bestiary = UIFactory.Button(window, "图鉴 (Tab)", () =>
             {
@@ -304,6 +326,13 @@ namespace MonsterMart.UI
             }, 20);
             UIFactory.Anchor(bestiary.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-905, 62), new Vector2(180, 56));
+
+            // 远征已经挪到晨会（§2.1 阶段一）——一天只有一趟，
+            // 这里只留一行状态，免得玩家以为还能再去一次。
+            _expeditionStatus = UIFactory.Label(window, "", 18, UIFactory.InkDim,
+                                                TextAnchor.MiddleLeft, "ExpeditionStatus");
+            UIFactory.Anchor(_expeditionStatus.rectTransform, new Vector2(0, 0), new Vector2(0, 0),
+                             new Vector2(300, 62), new Vector2(460, 56));
 
             _upgradeButton = UIFactory.Button(window, "", UpgradeCheckout, 20);
             UIFactory.Anchor(_upgradeButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
@@ -323,8 +352,23 @@ namespace MonsterMart.UI
                 _goalLabel.text = "今晚目标：" + plan.goalDescription;
             }
 
+            RefreshFooterForContext();
             RefreshCrowd(plan);
             RefreshAll();
+        }
+
+        /// <summary>
+        /// 营业中打开的话，「开始营业」按钮没有意义（店已经开了），
+        /// 关闭按钮的文案也该从「回去摆货」换成「继续营业」。
+        /// </summary>
+        void RefreshFooterForContext()
+        {
+            bool duringBusiness = DuringBusiness;
+
+            _startButton.gameObject.SetActive(!duringBusiness);
+            _closeLabel.text = duringBusiness ? "继续营业" : "自己去店里摆";
+
+            if (duringBusiness) _title.text = "补货";
         }
 
         /// <summary>
@@ -333,6 +377,10 @@ namespace MonsterMart.UI
         /// </summary>
         public void TryBeginBusiness()
         {
+            // 双重保险：正常情况下按钮在营业中会被隐藏点不到，但防止意外触发
+            // 重复调用 BeginBusiness —— 那会把营业计时器和随机事件重新初始化一遍。
+            if (DuringBusiness) return;
+
             int totalStock = 0;
             for (int i = 0; i < GameDatabase.Products.Count; i++)
                 totalStock += Game.Store.WarehouseCount(GameDatabase.Products[i]);
@@ -352,6 +400,29 @@ namespace MonsterMart.UI
             }
 
             Game.Manager.BeginBusiness();
+        }
+
+        /// <summary>
+        /// 今天那趟远征的结果摘要 —— 出发按钮在晨会界面上（§2.1 阶段一）。
+        /// </summary>
+        string ExpeditionStatusText()
+        {
+            var squad = StaffRoster.ExpeditionSquad();
+
+            if (Game.Manager != null && !Game.Manager.ExpeditionDoneToday)
+                return "<color=#FFD966>今天还没出门</color>";
+
+            if (squad.Length == 0)
+                return "今天没有出门进货，只能卖现有库存";
+
+            var names = new List<string>();
+            for (int i = 0; i < squad.Length; i++)
+            {
+                var data = GameDatabase.GetStaff(squad[i]);
+                if (data != null) names.Add(data.displayName);
+            }
+            return $"今天出征：{string.Join("、", names)}　" +
+                   "<color=#8FA8C8>（他们晚上会累）</color>";
         }
 
         void Buy(ProductData product, int amount)
@@ -434,6 +505,9 @@ namespace MonsterMart.UI
                 row.buyOne.interactable = canBuy1;
                 row.buyFive.interactable = canBuy5;
             }
+
+            if (_expeditionStatus != null)
+                _expeditionStatus.text = ExpeditionStatusText();
 
             RefreshPreview();
             RefreshUpgradeButton();

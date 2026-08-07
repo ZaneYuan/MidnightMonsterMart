@@ -31,6 +31,10 @@ namespace MonsterMart.UI
         RectTransform _prepBar;
         Text _prepHint;
 
+        RectTransform _speedBar;
+        readonly List<Image> _speedButtonBgs = new List<Image>();
+        readonly List<float> _speedButtonValues = new List<float>();
+
         readonly List<ToastEntry> _toasts = new List<ToastEntry>();
 
         class ToastEntry
@@ -54,7 +58,45 @@ namespace MonsterMart.UI
             BuildBottom(root);
             BuildHoldBar(root);
             BuildPreparationBar(root);
+            BuildSpeedControls(root);
             BuildToasts(root);
+        }
+
+        /// <summary>
+        /// 营业倍速条 —— 用户反馈明确要求「支持 1/1.25/1.5/2/2.5/3 倍速」。
+        /// 只在营业中显示，点哪个就切到哪个（GameManager.SetBusinessSpeed）。
+        /// </summary>
+        void BuildSpeedControls(RectTransform root)
+        {
+            const float BarWidth = 330f;
+
+            var box = UIFactory.Panel(root, UIFactory.PanelBg, "SpeedBar");
+            UIFactory.Anchor(box.rectTransform, new Vector2(0, 1), new Vector2(0, 1),
+                             new Vector2(180, -186), new Vector2(BarWidth, 52));
+            _speedBar = box.rectTransform;
+
+            var speeds = GameManager.BusinessSpeedOptions;
+            const float gap = 4f;
+            float btnW = (BarWidth - gap * (speeds.Length + 1)) / speeds.Length;
+
+            for (int i = 0; i < speeds.Length; i++)
+            {
+                float speed = speeds[i];
+                string caption = Mathf.Approximately(speed, Mathf.Round(speed))
+                    ? $"{speed:0}x" : $"{speed:0.0#}x";
+
+                var btn = UIFactory.Button(box.transform, caption,
+                    () => Game.Manager?.SetBusinessSpeed(speed), 15, UIFactory.ButtonBg);
+
+                float x = gap + i * (btnW + gap) - BarWidth * 0.5f + btnW * 0.5f;
+                UIFactory.Anchor(btn.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                                 new Vector2(x, 0), new Vector2(btnW, 40));
+
+                _speedButtonBgs.Add(btn.GetComponent<Image>());
+                _speedButtonValues.Add(speed);
+            }
+
+            _speedBar.gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -158,7 +200,7 @@ namespace MonsterMart.UI
                              new Vector2(40, 16), new Vector2(700, 32));
 
             _hintLabel = UIFactory.Label(box.transform,
-                "WASD 移动 · 双击方向键 加速 · 长按 E 交互 · Tab 图鉴 · Esc 暂停",
+                "WASD 移动 · 双击方向键 加速 · 长按 E 交互 · B 补货 · Tab 图鉴 · Esc 暂停",
                 17, new Color(0.55f, 0.55f, 0.66f), TextAnchor.MiddleCenter, "Hint");
             UIFactory.Anchor(_hintLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                              new Vector2(40, -22), new Vector2(700, 24));
@@ -213,7 +255,22 @@ namespace MonsterMart.UI
             UpdateCarry();
             UpdatePrompt();
             UpdatePreparationBar();
+            UpdateSpeedBar();
             UpdateToasts();
+        }
+
+        void UpdateSpeedBar()
+        {
+            if (_speedBar == null) return;
+
+            bool show = Game.Manager != null && Game.Manager.State == GameState.Open;
+            if (_speedBar.gameObject.activeSelf != show) _speedBar.gameObject.SetActive(show);
+            if (!show) return;
+
+            float current = Game.Manager.BusinessSpeed;
+            for (int i = 0; i < _speedButtonBgs.Count; i++)
+                _speedButtonBgs[i].color = Mathf.Approximately(_speedButtonValues[i], current)
+                    ? UIFactory.ButtonBgHi : UIFactory.ButtonBg;
         }
 
         void UpdatePreparationBar()

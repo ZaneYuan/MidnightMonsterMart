@@ -28,11 +28,22 @@ namespace MonsterMart.Store
 
         public bool SessionOpen => ActiveCustomer != null;
 
-        public float ScanWindow =>
-            Level >= 1 ? GameConfig.ScanUpgradedWindow : GameConfig.ScanBaseWindow;
+        /// <summary>
+        /// 收银岗的效率（0 = 今晚没排人）— 设计文档 §4.3
+        /// 「收银：决定结账速度、错误率和排队耐心」。
+        /// </summary>
+        public static float CashierEfficiency =>
+            StaffRoster.EfficiencyOn(StaffAssignment.Cashier);
 
+        /// <summary>扫描判定区。收银台等级决定基线，收银岗的员工在此之上加宽。</summary>
+        public float ScanWindow =>
+            (Level >= 1 ? GameConfig.ScanUpgradedWindow : GameConfig.ScanBaseWindow) *
+            (1f + GameConfig.CashierScanBonus * CashierEfficiency);
+
+        /// <summary>排队额外掉耐心的倍率。排了收银岗就有人分担，队伍没那么焦躁。</summary>
         public float QueuePatienceMultiplier =>
-            Level >= 1 ? GameConfig.UpgradedQueuePatienceMultiplier : 1f;
+            (Level >= 1 ? GameConfig.UpgradedQueuePatienceMultiplier : 1f) *
+            (1f - GameConfig.CashierQueueRelief * CashierEfficiency);
 
         SpriteRenderer _scannerLight;
 

@@ -117,6 +117,19 @@ namespace MonsterMart.Core
 
         public static Vector3 PointerScreenPosition => Input.mousePosition;
 
+        /// <summary>
+        /// 数字键 1/2/3 —— 远征时释放三名员工的技能（设计文档 §3.2
+        /// 「技能按钮 1～3 / PC 数字键」）。和 ChoiceHotkey 同键位，
+        /// 但两者的读取场景互斥：有弹窗时远征不接受输入。
+        /// </summary>
+        public static int SkillHotkey => ChoiceHotkey;
+
+        /// <summary>R：撤退 — 设计文档 §3.2「撤退：保留部分战利品并提前回店」。</summary>
+        public static bool RetreatPressed => Input.GetKeyDown(KeyCode.R);
+
+        /// <summary>Q：目标标记 — 设计文档 §3.2「目标标记：优先攻击指定敌人」。</summary>
+        public static bool MarkTargetPressed => Input.GetKeyDown(KeyCode.Q);
+
         /// <summary>数字键 1/2/3 —— 事件弹窗的快捷选择。</summary>
         public static int ChoiceHotkey
         {

@@ -92,7 +92,10 @@ namespace MonsterMart.UI
             _goals.text = "<b>今日目标</b>\n" + s.goalReport;
             _goals.color = s.goalsMet ? UIFactory.Good : UIFactory.Warn;
 
-            _unlocks.text = "<b>新解锁</b>\n" + s.unlockNote;
+            // 排班的结果和「新解锁」并成一栏 —— 玩家要能把今晚的成绩
+            // 和早上那次排班对上号，否则双岗位系统只是个没有反馈的开关
+            _unlocks.text = "<b>员工</b>\n" + s.staffReport +
+                            "\n\n<b>新解锁</b>\n" + s.unlockNote;
 
             _continueLabel.text = Game.Day.IsLastDay ? "查看结局" : "进入下一天";
         }

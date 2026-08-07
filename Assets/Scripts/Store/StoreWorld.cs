@@ -374,6 +374,61 @@ namespace MonsterMart.Store
             return placed;
         }
 
+        // ------------------------------------------------------------------
+        // 补货岗 — 设计文档 §4.3「补货：从仓库搬运商品并维持货架库存」
+        // ------------------------------------------------------------------
+        /// <summary>
+        /// 距离下一次自动补货还有多久。开工时先垫满一个间隔 ——
+        /// 补货员总得先走一趟仓库，营业第一帧就凭空往货架上变出货来会很出戏。
+        /// </summary>
+        float _staffRestockTimer = GameConfig.StaffRestockSeconds;
+
+        /// <summary>
+        /// 排了补货岗的话，营业中每隔一段时间自动往最空的货架搬一件。
+        /// 疲劳会拖慢间隔（§4.4「过高时降低效率」）——
+        /// 一个刚跑完远征又来值夜班的员工，搬货速度只有精神饱满时的三分之一。
+        ///
+        /// 返回这一步搬了几件。抽成方法而不是写在 Update 里，
+        /// 是为了让无头用例能按固定 dt 驱动它。
+        /// </summary>
+        public int TickStaffRestock(float dt)
+        {
+            float efficiency = StaffRoster.EfficiencyOn(StaffAssignment.Restock);
+            if (efficiency <= 0f || dt <= 0f) return 0;
+
+            _staffRestockTimer -= dt;
+            if (_staffRestockTimer > 0f) return 0;
+
+            _staffRestockTimer = GameConfig.StaffRestockSeconds / efficiency;
+            return RestockEmptiestShelf();
+        }
+
+        /// <summary>往「缺得最狠」的销售货架补一件。返回实际搬了几件。</summary>
+        public int RestockEmptiestShelf()
+        {
+            Shelf target = null;
+            int worstGap = 0;
+
+            for (int i = 0; i < Shelves.Count; i++)
+            {
+                var shelf = Shelves[i];
+                if (shelf == null || shelf.isSupplyRack || shelf.product == null) continue;
+                if (shelf.knockedOver) continue;               // 倒了的货架得玩家去扶
+
+                int gap = shelf.capacity - shelf.count;
+                if (gap <= 0 || gap <= worstGap) continue;
+                if (WarehouseCount(shelf.product) <= 0) continue;
+
+                worstGap = gap;
+                target = shelf;
+            }
+
+            if (target == null) return 0;
+
+            int taken = TakeFromWarehouse(target.product, GameConfig.StaffRestockBatch);
+            return taken <= 0 ? 0 : target.AddStock(taken);
+        }
+
         public int TakeFromWarehouse(ProductData product, int amount)
         {
             int available = WarehouseCount(product);
@@ -403,6 +458,7 @@ namespace MonsterMart.Store
         /// <summary>把营业日之间需要重置的东西清掉。</summary>
         public void ResetForNewDay()
         {
+            _staffRestockTimer = GameConfig.StaffRestockSeconds;
             ClearAllStains();
             for (int i = 0; i < Shelves.Count; i++)
                 if (Shelves[i].knockedOver) Shelves[i].Lift();

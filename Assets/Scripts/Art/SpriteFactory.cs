@@ -93,6 +93,30 @@ namespace MonsterMart.Art
             return sprite;
         }
 
+        /// <summary>打击特效 —— 几条放射状的短刺叠一圈，命中瞬间的火花。</summary>
+        public static Sprite HitSpark(Color color)
+        {
+            string key = "hitspark_" + ColorKey(color);
+            if (_cache.TryGetValue(key, out var cached)) return cached;
+
+            const int size = 24;
+            var tex = NewTexture(size, size);
+            Fill(tex, Color.clear);
+
+            float cx = size * 0.5f, cy = size * 0.5f;
+            for (int i = 0; i < 6; i++)
+            {
+                float angle = i * (Mathf.PI * 2f / 6f);
+                DrawSpike(tex, cx, cy, angle, size * 0.42f, 2.2f, color);
+            }
+            DrawCircle(tex, cx, cy, 3f, Lighten(color, 0.3f));
+
+            tex.Apply();
+            var sprite = Make(tex, 0.5f, 0.5f);
+            _cache[key] = sprite;
+            return sprite;
+        }
+
         /// <summary>不规则水渍形状 —— 史莱姆污渍。</summary>
         public static Sprite Stain(Color color, int seed)
         {
@@ -262,6 +286,36 @@ namespace MonsterMart.Art
             return data.runtimeSprite;
         }
 
+        /// <summary>远征里的怪物员工 —— 复用顾客那一套外形，同一只怪物在店里和远征里长得一样。</summary>
+        public static Sprite Character(StaffData data)
+        {
+            if (data.runtimeSprite != null) return data.runtimeSprite;
+            data.runtimeSprite = BuildCharacter(data.bodyColor, data.accentColor, SilhouetteFor(data.monsterType));
+            return data.runtimeSprite;
+        }
+
+        /// <summary>远征敌人 —— 用 <see cref="EnemyData.silhouette"/> 指定的专属外形（蘑菇/荆棘/盗贼/守卫/巨兽）。</summary>
+        public static Sprite Character(EnemyData data)
+        {
+            if (data.runtimeSprite != null) return data.runtimeSprite;
+            data.runtimeSprite = BuildCharacter(data.bodyColor, data.accentColor, data.silhouette);
+            return data.runtimeSprite;
+        }
+
+        /// <summary>顾客表里怪物种类对外形编号的约定（见 GameDatabase 顾客定义）。</summary>
+        static int SilhouetteFor(MonsterType type)
+        {
+            switch (type)
+            {
+                case MonsterType.Vampire: return 0;
+                case MonsterType.Werewolf: return 1;
+                case MonsterType.Ghost: return 2;
+                case MonsterType.Slime: return 3;
+                case MonsterType.Inspector: return 4;
+                default: return 0;
+            }
+        }
+
         public static Sprite PlayerSprite()
         {
             const string key = "player";
@@ -283,6 +337,10 @@ namespace MonsterMart.Art
             {
                 case 2: BuildGhostShape(tex, body, accent); break;
                 case 3: BuildSlimeShape(tex, body, accent); break;
+                case 6: BuildMushroomShape(tex, body, accent); break;
+                case 7: BuildThornShape(tex, body, accent); break;
+                case 9: BuildGuardShape(tex, body, accent, dark); break;
+                case 10: BuildBehemothShape(tex, body, accent); break;
                 default: BuildHumanoidShape(tex, body, accent, dark, silhouette); break;
             }
 
@@ -294,7 +352,8 @@ namespace MonsterMart.Art
         static void BuildHumanoidShape(Texture2D tex, Color body, Color accent, Color dark, int silhouette)
         {
             bool bulky = silhouette == 1;      // 狼人体型更大
-            bool coat = silhouette == 4;       // 检查员穿风衣
+            bool coat = silhouette == 4 || silhouette == 8;   // 检查员/森林盗贼都穿外套
+            bool masked = silhouette == 8;     // 森林盗贼多一条眼罩，和检查员的风衣区分开
 
             int halfW = bulky ? 11 : 8;
             int torsoTop = 32;
@@ -329,6 +388,11 @@ namespace MonsterMart.Art
             tex.SetPixel((int)hcx - 2, (int)hcy + 1, accent);
             tex.SetPixel((int)hcx + 2, (int)hcy + 1, accent);
             tex.SetPixel((int)hcx + 3, (int)hcy + 1, accent);
+
+            // 眼罩：贴着眼睛下方一条深色带，把盗贼和同样穿外套的检查员区分开
+            if (masked)
+                for (int x = (int)hcx - 6; x <= (int)hcx + 6; x++)
+                    tex.SetPixel(x, (int)hcy - 1, dark);
 
             // 领口 / 装饰色
             for (int x = CharW / 2 - halfW; x < CharW / 2 + halfW; x++)
@@ -398,6 +462,148 @@ namespace MonsterMart.Art
             tex.SetPixel(cx - 3, baseY + 14, accent);
             tex.SetPixel(cx + 3, baseY + 14, accent);
             tex.SetPixel(cx + 4, baseY + 14, accent);
+        }
+
+        /// <summary>跳跳菇：伞盖 + 菌柄 + 两条短腿，蹦跳感的小型外形。</summary>
+        static void BuildMushroomShape(Texture2D tex, Color body, Color accent)
+        {
+            var dark = Darken(body, 0.35f);
+            var stem = Lighten(body, 0.55f);
+            int cx = CharW / 2;
+
+            // 伞盖：椭圆的上半部分，flat 底、圆顶
+            float capCy = 34f, capRx = 13f, capRy = 11f;
+            for (int y = 0; y < CharH; y++)
+            {
+                for (int x = 0; x < CharW; x++)
+                {
+                    float dx = (x + 0.5f - cx) / capRx;
+                    float dy = (y + 0.5f - capCy) / capRy;
+                    if (dy >= 0f && dx * dx + dy * dy <= 1f) tex.SetPixel(x, y, body);
+                }
+            }
+
+            DrawCircle(tex, cx - 6, capCy + 4, 2.2f, accent);
+            DrawCircle(tex, cx + 5, capCy + 3, 2f, accent);
+            DrawCircle(tex, cx, capCy + 7, 1.8f, accent);
+
+            // 菌柄
+            int stemHalf = 5;
+            for (int y = 8; y < 24; y++)
+                for (int x = cx - stemHalf; x < cx + stemHalf; x++)
+                    tex.SetPixel(x, y, stem);
+
+            // 两条短腿
+            for (int y = 3; y < 9; y++)
+            {
+                for (int x = cx - stemHalf - 1; x < cx - 2; x++) tex.SetPixel(x, y, dark);
+                for (int x = cx + 2; x < cx + stemHalf + 1; x++) tex.SetPixel(x, y, dark);
+            }
+
+            OutlineChar(tex, dark);
+        }
+
+        /// <summary>刺藤精：史莱姆同款胶质团，外圈加一圈荆棘尖刺。</summary>
+        static void BuildThornShape(Texture2D tex, Color body, Color accent)
+        {
+            var gel = new Color(body.r, body.g, body.b, 0.9f);
+            var dark = Darken(body, 0.4f);
+            int cx = CharW / 2;
+            int baseY = 4;
+            int height = 26;
+            int halfW = 11;
+
+            for (int y = baseY; y < baseY + height; y++)
+            {
+                float t = (y - baseY) / (float)height;
+                int w = (int)(halfW * Mathf.Sqrt(Mathf.Max(0f, 1f - t * t)));
+                for (int x = cx - w; x <= cx + w; x++) tex.SetPixel(x, y, gel);
+            }
+
+            // 荆棘：绕轮廓均分几根尖刺
+            float thornCy = baseY + height * 0.5f;
+            for (int i = 0; i < 6; i++)
+            {
+                float a = i * (Mathf.PI * 2f / 6f) + 0.3f;
+                float bx = cx + Mathf.Cos(a) * halfW * 0.85f;
+                float by = thornCy + Mathf.Sin(a) * height * 0.42f;
+                DrawSpike(tex, bx, by, a, 5f, 1.6f, accent);
+            }
+
+            tex.SetPixel(cx - 4, baseY + 16, dark);
+            tex.SetPixel(cx + 3, baseY + 16, dark);
+
+            OutlineChar(tex, dark);
+        }
+
+        /// <summary>孢囊守卫：借用狼人那套「体型更大」的躯干，肩上再加一对孢子荚。</summary>
+        static void BuildGuardShape(Texture2D tex, Color body, Color accent, Color dark)
+        {
+            BuildHumanoidShape(tex, body, accent, dark, 1);
+
+            DrawCircle(tex, CharW / 2 - 10, 30, 3.4f, accent);
+            DrawCircle(tex, CharW / 2 + 10, 30, 3.4f, accent);
+            DrawCircle(tex, CharW / 2 - 10, 30, 1.6f, Darken(accent, 0.3f));
+            DrawCircle(tex, CharW / 2 + 10, 30, 1.6f, Darken(accent, 0.3f));
+        }
+
+        /// <summary>孢子巨兽：比史莱姆更宽更满的胶质团，带三颗暗示喷口的结节。</summary>
+        static void BuildBehemothShape(Texture2D tex, Color body, Color accent)
+        {
+            var gel = new Color(body.r, body.g, body.b, 0.95f);
+            var dark = Darken(body, 0.4f);
+            int cx = CharW / 2;
+            int baseY = 2;
+            int height = 34;
+            int halfW = 15;
+
+            for (int y = baseY; y < baseY + height; y++)
+            {
+                float t = (y - baseY) / (float)height * 2f - 1f;
+                int w = (int)(halfW * Mathf.Sqrt(Mathf.Max(0f, 1f - t * t)));
+                for (int x = cx - w; x <= cx + w; x++) tex.SetPixel(x, y, gel);
+            }
+
+            DrawCircle(tex, cx - 9, baseY + 22, 3.2f, Darken(accent, 0.15f));
+            DrawCircle(tex, cx + 9, baseY + 22, 3.2f, Darken(accent, 0.15f));
+            DrawCircle(tex, cx, baseY + 30, 3.6f, Darken(accent, 0.15f));
+            DrawCircle(tex, cx - 9, baseY + 22, 1.3f, accent);
+            DrawCircle(tex, cx + 9, baseY + 22, 1.3f, accent);
+            DrawCircle(tex, cx, baseY + 30, 1.5f, accent);
+
+            DrawCircle(tex, cx - 5, baseY + 24, 1.6f, new Color(0.95f, 0.85f, 0.2f));
+            DrawCircle(tex, cx + 5, baseY + 24, 1.6f, new Color(0.95f, 0.85f, 0.2f));
+
+            OutlineChar(tex, dark);
+        }
+
+        /// <summary>在已有贴图上叠画一个填充圆——拼装新外形（斑点、护甲荚、结节）用。</summary>
+        static void DrawCircle(Texture2D tex, float cx, float cy, float r, Color color)
+        {
+            int minX = Mathf.Max(0, Mathf.FloorToInt(cx - r));
+            int maxX = Mathf.Min(tex.width - 1, Mathf.CeilToInt(cx + r));
+            int minY = Mathf.Max(0, Mathf.FloorToInt(cy - r));
+            int maxY = Mathf.Min(tex.height - 1, Mathf.CeilToInt(cy + r));
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                    if (dx * dx + dy * dy <= r * r) tex.SetPixel(x, y, color);
+                }
+            }
+        }
+
+        /// <summary>沿角度画一根从粗到细的短刺——荆棘精的尖刺用。</summary>
+        static void DrawSpike(Texture2D tex, float cx, float cy, float angle, float length, float thickness, Color color)
+        {
+            float dirX = Mathf.Cos(angle), dirY = Mathf.Sin(angle);
+            for (float t = 0f; t <= length; t += 0.5f)
+            {
+                float w = thickness * (1f - t / length);
+                DrawCircle(tex, cx + dirX * t, cy + dirY * t, Mathf.Max(0.6f, w), color);
+            }
         }
 
         static void OutlineChar(Texture2D tex, Color color)

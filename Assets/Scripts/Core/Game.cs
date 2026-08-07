@@ -1,5 +1,6 @@
 using MonsterMart.Customers;
 using MonsterMart.Events;
+using MonsterMart.Expeditions;
 using MonsterMart.Player;
 using MonsterMart.Store;
 using MonsterMart.UI;
@@ -25,6 +26,11 @@ namespace MonsterMart.Core
         public static UIRoot UI;
         public static AudioDirector Audio;
 
+        /// <summary>白天异世界进货 — 设计文档 §3。</summary>
+        public static ExpeditionManager Expedition;
+
+        public static CameraRig Camera;
+
         public static bool IsReady =>
             Manager != null && Store != null && Player != null && UI != null;
 
@@ -41,6 +47,8 @@ namespace MonsterMart.Core
             Events = null;
             UI = null;
             Audio = null;
+            Expedition = null;
+            Camera = null;
         }
     }
 }

@@ -46,6 +46,14 @@ namespace MonsterMart.Data
         public int goalMinProfit;
         public int goalMinReputation;
         public int goalMinCleanliness;
+
+        /// <summary>
+        /// 当天最多允许被狼人撞倒几个货架；-1 表示没有这项目标。
+        /// 用 -1 而不是 0 当哨兵，因为 0 本身是「一个都不许倒」这个合法目标。
+        /// 设计文档 §10 第二天：「不让狼人破坏超过一个货架」。
+        /// </summary>
+        public int goalMaxShelvesKnocked = -1;
+
         [TextArea(2, 6)] public string goalDescription;
 
         [Header("启用的事件")]

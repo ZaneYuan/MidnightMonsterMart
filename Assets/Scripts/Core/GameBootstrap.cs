@@ -3,6 +3,7 @@ using MonsterMart.Art;
 using MonsterMart.Customers;
 using MonsterMart.Data;
 using MonsterMart.Events;
+using MonsterMart.Expeditions;
 using MonsterMart.Player;
 using MonsterMart.Store;
 using MonsterMart.UI;
@@ -32,9 +33,21 @@ namespace MonsterMart.Core
             _instance.BootGame();
         }
 
-        /// <summary>从暂停菜单或结局界面重开一局。</summary>
-        public static void RestartGame()
+        /// <summary>下一次 BootGame 强制开新局（玩家主动点了「重新开始」）。一次性。</summary>
+        static bool _forceFreshRun;
+
+        /// <summary>
+        /// 从暂停菜单或结局界面重开一局。
+        ///
+        /// <paramref name="freshRun"/> = true 表示玩家主动要求重开（暂停菜单的
+        /// 「重新开始」）：哪怕存档还没打完也要丢弃本局进度，从第一天来过。
+        /// 结局界面的「再开一局」不用传 —— 那份存档已经带 runCompleted 了。
+        /// 两条路径都只丢本局进度，图鉴和音量走 SaveSystem.Apply 的跨局分支保留。
+        /// </summary>
+        public static void RestartGame(bool freshRun = false)
         {
+            _forceFreshRun = freshRun;
+
             if (_instance == null)
             {
                 AutoBoot();
@@ -50,6 +63,10 @@ namespace MonsterMart.Core
         {
             Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 1;
+
+            // 上一局如果是在营业倍速中被「重新开始」打断的，Time.timeScale 不会经过
+            // GameManager.CloseStore 归位 —— 新的一局必须从正常速度开始。
+            Time.timeScale = 1f;
 
             GameDatabase.EnsureBuilt();
             InteractableRegistry.Clear();
@@ -73,9 +90,28 @@ namespace MonsterMart.Core
             DiscoverDayOneMonsters();
 
             var save = SaveSystem.Load();
-            if (save != null) SaveSystem.Apply(save);
 
-            Game.Manager.StartNewRun(save != null ? save.currentDay : 1);
+            // 上一局已经通关的存档只还原图鉴和音量，进度从第一天重来。
+            // 否则终局存档里的 currentDay 还是最后一天，重进（以及结局界面的
+            // 「再开一局」，走的是同一条 BootGame 路径）都会被丢回去重打。
+            bool resume = SaveSystem.ShouldResume(save, _forceFreshRun);
+            _forceFreshRun = false;
+
+            // 本局进度先归零，读档再填回来 —— 没有存档时（首次开局 / 存档被删）
+            // 也不能带着上一局残留的冷藏货架核心和疲劳进新局。
+            ExpeditionProgress.Reset();
+            StaffRoster.Reset();
+            CaptainProgress.Reset();
+
+            if (save != null) SaveSystem.Apply(save, resume);
+
+            Game.Manager.StartNewRun(resume ? SaveSystem.ResumeDay(save) : 1,
+                                     resume ? save.totalProfit : 0);
+
+            // 存档停在「今天已经跑完远征」那一段的话，跳过晨会直接进闭店准备 ——
+            // 否则玩家要么白跑一趟，要么带着到手的战利品再去一趟。
+            if (resume && SaveSystem.ShouldResumeAfterExpedition(save))
+                Game.Manager.ResumeAfterExpedition();
         }
 
         void Teardown()
@@ -120,6 +156,7 @@ namespace MonsterMart.Core
 
             _cameraRig = _cameraObject.AddComponent<CameraRig>();
             _cameraRig.Initialize(camera, null);
+            Game.Camera = _cameraRig;
         }
 
         void BuildAudio(Transform parent)
@@ -152,6 +189,10 @@ namespace MonsterMart.Core
             Game.Day = go.AddComponent<DayManager>();
             Game.Events = go.AddComponent<RandomEventManager>();
             Game.Manager = go.AddComponent<GameManager>();
+
+            var expeditionGo = new GameObject("Expedition");
+            expeditionGo.transform.SetParent(parent, false);
+            Game.Expedition = expeditionGo.AddComponent<ExpeditionManager>();
         }
 
         void BuildStore(Transform parent)

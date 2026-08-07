@@ -28,6 +28,9 @@ namespace MonsterMart.Core
         public bool goalsMet;
         public string goalReport;
         public string unlockNote;
+
+        /// <summary>今天谁干了什么、现在多累 — 设计文档 §4.4。</summary>
+        public string staffReport;
     }
 
     /// <summary>
@@ -173,6 +176,15 @@ namespace MonsterMart.Core
                     report.Add($"{Mark(ok)} 整洁度 {Mathf.RoundToInt(s.cleanliness)} / 需 ≥ {CurrentPlan.goalMinCleanliness}");
                 }
 
+                // 狼人撞倒货架 —— ShelvesKnockedOver 一直在记，但以前没人读它，
+                // 于是第二天简报里写着的「不让狼人破坏超过一个货架」从来没被判过。
+                if (CurrentPlan.goalMaxShelvesKnocked >= 0)
+                {
+                    bool ok = ShelvesKnockedOver <= CurrentPlan.goalMaxShelvesKnocked;
+                    met &= ok;
+                    report.Add($"{Mark(ok)} 被撞倒的货架 {ShelvesKnockedOver} / 最多 {CurrentPlan.goalMaxShelvesKnocked}");
+                }
+
                 if (CurrentPlan.spawnInspector)
                 {
                     bool ok = InspectionDone;
@@ -186,7 +198,40 @@ namespace MonsterMart.Core
             s.goalsMet = met;
             s.goalReport = string.Join("\n", report);
             s.unlockNote = BuildUnlockNote();
+            s.staffReport = BuildStaffReport();
             return s;
+        }
+
+        /// <summary>
+        /// 今天谁干了什么、明天还剩几分力 — 设计文档 §4.4。
+        ///
+        /// 结算时才是玩家把「早上那次排班」和「今晚这个结果」对上号的时刻，
+        /// 所以这一栏要写清楚谁连轴转了、谁已经累坏了。
+        /// </summary>
+        static string BuildStaffReport()
+        {
+            var roster = StaffRoster.All;
+            if (roster.Count == 0) return "（还没有员工）";
+
+            var lines = new List<string>();
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var entry = roster[i];
+                if (entry.Data == null) continue;
+
+                var duties = new List<string>();
+                if (entry.onExpedition) duties.Add("远征");
+                if (entry.nightJob != StaffAssignment.Rest)
+                    duties.Add(StaffRoster.NightJobLabel(entry.nightJob));
+
+                string duty = duties.Count > 0 ? string.Join(" + ", duties) : "休息";
+                string tail = entry.IsDoubleShift ? "　<color=#F26B61>连轴转</color>" : "";
+
+                lines.Add($"{entry.Data.displayName}　Lv.{entry.level}　{duty}　" +
+                          $"{StaffRoster.FatigueLabel(entry)}{tail}");
+            }
+
+            return string.Join("\n", lines);
         }
 
         static string Mark(bool ok) => ok ? "✓" : "✗";
