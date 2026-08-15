@@ -202,6 +202,66 @@ namespace MonsterMart.Core
             EnterPreparation();
         }
 
+        // ------------------------------------------------------------------
+        // 纯远征模式 —— 用户明确要求「给远征模式开一个单独的入口，不需要白天
+        // 打怪晚上看店，可以纯一直打怪通关」。跳过晨会/闭店准备/营业，
+        // 打完一趟立刻能再来一趟，不受「一天一趟远征」限制。
+        // ------------------------------------------------------------------
+        public bool ExpeditionOnlyMode { get; private set; }
+
+        /// <summary>暂停菜单的入口按钮调这个。</summary>
+        public void ToggleExpeditionOnlyMode()
+        {
+            Game.UI?.ClosePauseMenu();
+
+            if (ExpeditionOnlyMode) ExitExpeditionOnlyMode();
+            else EnterExpeditionOnlyMode();
+        }
+
+        public void EnterExpeditionOnlyMode()
+        {
+            if (Game.Expedition == null || Game.Expedition.IsRunning) return;
+
+            ExpeditionOnlyMode = true;
+            Game.UI?.CloseAllPanels();
+            StartAnotherLoopedExpedition();
+        }
+
+        /// <summary>
+        /// 打完一趟紧接着再来一趟。没排班（没进过晨会）就用默认队伍兜底，
+        /// 不然这个模式里永远凑不出队伍。
+        /// </summary>
+        public void StartAnotherLoopedExpedition()
+        {
+            var squad = StaffRoster.ExpeditionSquad();
+            if (squad.Length == 0) squad = GameDatabase.DefaultSquad;
+            Game.Expedition?.Begin(squad);
+        }
+
+        /// <summary>
+        /// 纯远征模式里一趟结束时调用（ExpeditionManager.Finish 里分流）——
+        /// 只结算疲劳，不进闭店准备、不受一天一趟限制，但照样存档，
+        /// 免得打了老半天因为没退出游戏就白打了。
+        /// </summary>
+        public void HandleLoopedExpeditionFinished()
+        {
+            StaffRoster.ApplyExpeditionFatigue();
+            SaveSystem.Save();
+        }
+
+        /// <summary>退出纯远征模式，回到便利店的正常日夜循环。</summary>
+        public void ExitExpeditionOnlyMode()
+        {
+            ExpeditionOnlyMode = false;
+
+            if (Game.Expedition != null && Game.Expedition.IsRunning)
+                Game.Expedition.Finish(ExpeditionOutcome.Retreated);   // Finish 会按新模式值走正常的 ReturnFromExpedition
+            else
+                EnterPreparation();
+
+            Game.UI?.CloseAllPanels();
+        }
+
         /// <summary>开门营业的状态部分，不碰 UI —— 方便无头验证。</summary>
         public void OpenStore()
         {
@@ -300,30 +360,33 @@ namespace MonsterMart.Core
             // 值了一晚夜班的人累积疲劳，休息的人回一点（§4.4）
             StaffRoster.ApplyNightShiftFatigue();
 
-            // 最后一天不在这里存档：它的结算界面后面紧跟着结局
-            // （ContinueAfterSettlement → FinishRun 会带 runCompleted 再存一次），
-            // 中间这一份没有价值；而一旦存下来，重进时会带着已含最后一天利润的
-            // 累计值重打最后一天，结算时再加一遍。
-            if (!Game.Day.IsLastDay) SaveSystem.Save();
+            // 无限连续经营：不再有「最后一天」，结算完总是存档。
+            SaveSystem.Save();
 
             return summary;
         }
 
-        /// <summary>结算界面点「进入下一天」。</summary>
+        /// <summary>
+        /// 结算界面点「进入下一天」——用户明确要求「取消三天限制，变成无限连续
+        /// 经营」，所以这里不再判断是不是最后一天，一直往下一天走。DayPlan 用完
+        /// 三套就循环（见 GameDatabase.GetDayCycled），检查员照旧每逢第 3 天来。
+        /// </summary>
         public void ContinueAfterSettlement()
         {
-            if (Game.Day.IsLastDay)
-            {
-                FinishRun();
-                return;
-            }
-
             Game.Day.AdvanceDay();
             EnterMorningBrief();
         }
 
         // ------------------------------------------------------------------
         // 结局 — 设计文档 §8
+        //
+        // 无限连续经营模式下，正常玩不会再走到这一段——三天原型的强制结局已经
+        // 取消了。这里的方法留着不删，是因为：
+        //   1. 旧版本（3 天封顶）存下的 runCompleted=true 存档仍然可能存在于玩家
+        //      的 persistentDataPath 里，GameBootstrap 读到这种存档时仍要能正确
+        //      识别「这局已经打完」并重开新局，而不是报错或卡死。
+        //   2. 这几个方法本身有回归用例直接覆盖（ConcludeRun/EvaluateEnding）。
+        // 如果以后确认不再需要兼容旧存档，可以连同 EndingView 一起整体删掉。
         // ------------------------------------------------------------------
         void FinishRun()
         {

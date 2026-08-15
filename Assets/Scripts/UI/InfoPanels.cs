@@ -97,7 +97,8 @@ namespace MonsterMart.UI
             _unlocks.text = "<b>员工</b>\n" + s.staffReport +
                             "\n\n<b>新解锁</b>\n" + s.unlockNote;
 
-            _continueLabel.text = Game.Day.IsLastDay ? "查看结局" : "进入下一天";
+            // 无限连续经营：不再有「最后一天」，结算完总是进下一天
+            _continueLabel.text = "进入下一天";
         }
     }
 
@@ -162,6 +163,12 @@ namespace MonsterMart.UI
     /// <summary>暂停菜单 — Esc。</summary>
     public class PauseView : UIPanel
     {
+        Button _expeditionModeButton;
+        Text _expeditionModeLabel;
+
+        /// <summary>给回归用例读的——按钮文案有没有跟着纯远征模式的开关状态换。</summary>
+        public string ExpeditionModeLabelText => _expeditionModeLabel != null ? _expeditionModeLabel.text : "";
+
         public void BuildUI(Transform canvas)
         {
             Root = UIFactory.NewRect("PauseView", canvas);
@@ -172,7 +179,7 @@ namespace MonsterMart.UI
 
             var window = UIFactory.Panel(Root, UIFactory.PanelBg, "Window");
             UIFactory.Anchor(window.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                             Vector2.zero, new Vector2(520, 480));
+                             Vector2.zero, new Vector2(520, 560));
 
             var title = UIFactory.Label(window.transform, "暂停", 40, UIFactory.Accent,
                                         TextAnchor.MiddleCenter, "Title");
@@ -181,23 +188,38 @@ namespace MonsterMart.UI
 
             var resume = UIFactory.Button(window.transform, "继续游戏", () => Game.Manager.Resume(), 24);
             UIFactory.Anchor(resume.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                             new Vector2(0, 70), new Vector2(340, 56));
+                             new Vector2(0, 130), new Vector2(340, 56));
 
             var bestiary = UIFactory.Button(window.transform, "怪物图鉴", () =>
             {
                 Game.UI.ToggleBestiary();
             }, 24);
             UIFactory.Anchor(bestiary.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                             new Vector2(0, 0), new Vector2(340, 56));
+                             new Vector2(0, 60), new Vector2(340, 56));
+
+            // 纯远征模式：不需要白天打怪晚上看店，可以纯一直打怪通关（用户明确要求）
+            _expeditionModeButton = UIFactory.Button(window.transform, "纯远征模式（无限刷怪）",
+                () => Game.Manager.ToggleExpeditionOnlyMode(), 22, new Color(0.30f, 0.34f, 0.46f));
+            UIFactory.Anchor(_expeditionModeButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                             new Vector2(0, -10), new Vector2(340, 56));
+            _expeditionModeLabel = _expeditionModeButton.GetComponentInChildren<Text>();
 
             var restart = UIFactory.Button(window.transform, "重新开始", () => Game.Manager.RestartRun(), 24);
             UIFactory.Anchor(restart.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                             new Vector2(0, -70), new Vector2(340, 56));
+                             new Vector2(0, -80), new Vector2(340, 56));
 
             var quit = UIFactory.Button(window.transform, "退出游戏", Application.Quit, 24,
                                         new Color(0.42f, 0.22f, 0.26f));
             UIFactory.Anchor(quit.GetComponent<RectTransform>(), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
                              new Vector2(0, 60), new Vector2(340, 52));
+        }
+
+        public override void Open()
+        {
+            base.Open();
+
+            bool active = Game.Manager != null && Game.Manager.ExpeditionOnlyMode;
+            _expeditionModeLabel.text = active ? "退出纯远征模式" : "纯远征模式（无限刷怪）";
         }
     }
 

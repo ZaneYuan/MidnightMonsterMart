@@ -133,6 +133,20 @@ namespace MonsterMart.Data
             return null;
         }
 
+        /// <summary>
+        /// 无限连续经营 —— 用户明确要求「取消三天限制」。原型只写了 3 套 DayPlan，
+        /// 第 4 天开始循环复用（第 4 天 = 第 1 天的内容，以此类推）。检查员固定挂在
+        /// 第 3 套 plan 上，循环之后就变成「每逢第 3 天来一次」，不用额外写判定。
+        /// </summary>
+        public static DayPlan GetDayCycled(int dayNumber)
+        {
+            EnsureBuilt();
+            if (_days.Count == 0) return null;
+
+            int wrapped = ((dayNumber - 1) % _days.Count) + 1;
+            return GetDay(wrapped);
+        }
+
         /// <summary>返回某个怪物明确喜欢的商品。</summary>
         public static List<ProductData> PreferredProducts(MonsterType type)
         {
@@ -356,7 +370,7 @@ namespace MonsterMart.Data
             inspector.bodyColor = new Color(0.30f, 0.30f, 0.34f);
             inspector.accentColor = new Color(0.85f, 0.80f, 0.55f);
             inspector.silhouette = 4;
-            inspector.bestiaryRule = "第三天固定出现。穿着风衣，看不出种类。他会检查缺货、整洁度、服务事故和顾客满意度，然后给出 A / B / C 或停业警告。";
+            inspector.bestiaryRule = "每逢第 3 天固定出现。穿着风衣，看不出种类。他会检查缺货、整洁度、服务事故和顾客满意度，然后给出 A / B / C 或停业警告。";
             inspector.arrivalClue = "有人递来一张空白的预约条。";
             _customers.Add(inspector);
         }
@@ -755,7 +769,9 @@ namespace MonsterMart.Data
             var d1 = ScriptableObject.CreateInstance<DayPlan>();
             d1.name = "Day1";
             d1.dayNumber = 1;
-            d1.title = "第一天 · 基础教学";
+            // 不带「第 N 天」前缀 —— 循环复用到第 4/7/10……天时，PreparationView
+            // 会自己拼上当时的真实天数（见 GameDatabase.GetDayCycled）。
+            d1.title = "基础教学";
             d1.briefing =
                 "右边是今晚收到的预约条 —— 客人不会报自己是谁，只留下一句话。\n" +
                 "对着商品列表想想他们要什么，把货备上。<b>猜错了就是白进货 + 客人空手离开。</b>\n" +
@@ -777,7 +793,7 @@ namespace MonsterMart.Data
             var d2 = ScriptableObject.CreateInstance<DayPlan>();
             d2.name = "Day2";
             d2.dayNumber = 2;
-            d2.title = "第二天 · 压力增加";
+            d2.title = "压力增加";
             d2.briefing =
                 "满月。今晚的预约条里有两位新面孔 —— 图鉴里还没有它们的记录，只能靠商品名硬猜。\n" +
                 "人多了，喜好开始互相打架：同一件商品可能是一位客人的心头好、另一位的禁区。\n" +
@@ -805,7 +821,7 @@ namespace MonsterMart.Data
             var d3 = ScriptableObject.CreateInstance<DayPlan>();
             d3.name = "Day3";
             d3.dayNumber = 3;
-            d3.title = "第三天 · 综合测试";
+            d3.title = "综合测试";
             d3.briefing =
                 "午夜商业管理局今晚会派检查员来。他穿着风衣，混在顾客里，你分不出是谁。\n" +
                 "他检查四件事：有没有缺货、店里干不干净、有没有顾客被气走、顾客满不满意。\n" +

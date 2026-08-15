@@ -1062,12 +1062,22 @@ namespace MonsterMart.Expeditions
                 if (Game.Player != null) Game.Camera.target = Game.Player.transform;
             }
 
-            Game.Manager.ReturnFromExpedition();
+            // 纯远征模式：不进闭店准备、不受一天一趟限制，打完立刻能再来一趟
+            // （用户明确要求「不需要白天打怪晚上看店，可以纯一直打怪通关」）。
+            bool loopMode = Game.Manager.ExpeditionOnlyMode;
+            if (loopMode) Game.Manager.HandleLoopedExpeditionFinished();
+            else Game.Manager.ReturnFromExpedition();
 
             Game.UI?.ShowChoice(
                 OutcomeTitle(outcome),
                 OutcomeBody(outcome, delivered),
-                new ChoiceOption("回到备货", "商品已经进仓库", () => { }));
+                loopMode
+                    ? new[]
+                      {
+                          new ChoiceOption("再次出征", "打怪升级持续生效，装备/等级都在", () => Game.Manager.StartAnotherLoopedExpedition()),
+                          new ChoiceOption("退出纯远征模式", "回到便利店经营", () => Game.Manager.ExitExpeditionOnlyMode()),
+                      }
+                    : new[] { new ChoiceOption("回到备货", "商品已经进仓库", () => { }) });
         }
 
         /// <summary>

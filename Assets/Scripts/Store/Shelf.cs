@@ -255,7 +255,10 @@ namespace MonsterMart.Store
             if (player == null) return false;
             if (CanTakeSupply(player)) return true;
             if (CanPickForGhost(player)) return true;
-            if (IsFull) return false;
+
+            // 货架满了但玩家手上正好拿着这个商品时也要算「可交互」——按 E 给个
+            // 明确提示，而不是安静地毫无反应（之前被当成「卡 bug 了」反馈过：
+            // 货架满了没法卸货，人也没法腾出手接下一件）。
             return player.Carry.Has(product);
         }
 
@@ -265,6 +268,7 @@ namespace MonsterMart.Store
             if (CanTakeSupply(player))
                 return $"[E] 取用 {product.displayName}（架上 {count}）";
             if (CanPickForGhost(player)) return $"[E] 取下 {product.displayName}（幽灵在等）";
+            if (IsFull) return $"这个货架满了（{count}/{capacity}）—— 去别的货架，或者回仓库放回";
 
             int amount = Mathf.Min(player.Carry.Count, capacity - count);
             string verb = isSupplyRack ? "补充清洁用品" : "补货";
@@ -311,6 +315,13 @@ namespace MonsterMart.Store
                     Game.Audio?.PlayPickup();
                     Game.UI?.Hud?.Flash($"拿起 {product.displayName}，送去灵界包装台");
                 }
+                return;
+            }
+
+            if (IsFull)
+            {
+                Game.UI?.Hud?.Flash($"「{displayName}」已经满了，去别的货架，或者回仓库放回");
+                Game.Audio?.PlayError();
                 return;
             }
 

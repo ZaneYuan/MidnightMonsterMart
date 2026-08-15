@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 using MonsterMart.Art;
 using MonsterMart.Core;
 using MonsterMart.Customers;
@@ -12,9 +11,14 @@ namespace MonsterMart.UI
 {
     /// <summary>
     /// 收银界面 — 设计文档 §5。
-    /// 商品逐件出现在台面上，玩家把它拖过扫描区域；
+    /// 商品逐件出现在台面上，玩家点一下就扫描；
     /// 漏扫减少收入、重复扫描降低满意度、扫得太慢顾客掉耐心。
     /// 原型不做真实找零（文档 §5.1「原型简化方案」）。
+    ///
+    /// 用户反馈明确要求「直接点击一件结账，不需要一个个拖到扫描区域」——
+    /// 以前是把商品拖进一个判定区（位置技巧），现在改成点击直接扫描，
+    /// 收银台升级 / 收银岗位的加成从「判定区更大」改成「两次扫描间隔更短」
+    /// （见 Checkout.ScanIntervalSeconds），经济系统还是有意义的，只是不再考验手速。
     /// </summary>
     public class CheckoutView : UIPanel
     {
@@ -27,9 +31,6 @@ namespace MonsterMart.UI
         Text _totalLabel;
         Image _patienceBar;
         RectTransform _counter;
-        RectTransform _scanZone;
-        RectTransform _dragLayer;
-        Image _scanGlow;
         Button _finishButton;
 
         Checkout _checkout;
@@ -37,6 +38,7 @@ namespace MonsterMart.UI
 
         readonly List<ScanItem> _items = new List<ScanItem>();
         float _sessionTime;
+        float _scanLockRemaining;
         bool _finishing;
 
         class ScanItem
@@ -44,7 +46,7 @@ namespace MonsterMart.UI
             public ProductData product;
             public bool scanned;
             public bool swallowed;      // 史莱姆吞下的额外商品
-            public DraggableItem widget;
+            public Image panel;
             public Image icon;
             public Text label;
         }
@@ -63,7 +65,7 @@ namespace MonsterMart.UI
             UIFactory.Anchor(_title.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
                              new Vector2(0, -40), new Vector2(-60, 38));
 
-            _statusLabel = UIFactory.Label(window.transform, "把商品拖到右侧扫描区", 20, UIFactory.InkDim,
+            _statusLabel = UIFactory.Label(window.transform, "点一下商品完成扫描", 20, UIFactory.InkDim,
                                            TextAnchor.MiddleLeft, "Status");
             UIFactory.Anchor(_statusLabel.rectTransform, new Vector2(0, 1), new Vector2(1, 1),
                              new Vector2(0, -76), new Vector2(-60, 28));
@@ -82,25 +84,11 @@ namespace MonsterMart.UI
             _patienceBar.fillMethod = Image.FillMethod.Horizontal;
             _patienceBar.raycastTarget = false;
 
-            // 台面
+            // 台面：以前一半空间给拖拽用的扫描区，现在点击直接扫描，台面吃满整行
             var counterPanel = UIFactory.Panel(window.transform, new Color(0.16f, 0.14f, 0.22f), "Counter");
-            UIFactory.Anchor(counterPanel.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f),
-                             new Vector2(520, -30), new Vector2(980, 230));
+            UIFactory.Anchor(counterPanel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                             new Vector2(0, -30), new Vector2(1360, 230));
             _counter = counterPanel.rectTransform;
-
-            // 扫描区
-            var zonePanel = UIFactory.Panel(window.transform, new Color(0.18f, 0.30f, 0.22f), "ScanZone");
-            UIFactory.Anchor(zonePanel.rectTransform, new Vector2(1, 0.5f), new Vector2(1, 0.5f),
-                             new Vector2(-190, -30), new Vector2(300, 230));
-            _scanZone = zonePanel.rectTransform;
-
-            _scanGlow = UIFactory.Panel(zonePanel.transform, new Color(0.45f, 1f, 0.55f, 0f), "Glow");
-            UIFactory.Stretch(_scanGlow.rectTransform);
-            _scanGlow.raycastTarget = false;
-
-            var zoneLabel = UIFactory.Label(zonePanel.transform, "扫描区\n把商品拖到这里", 22, UIFactory.Ink,
-                                            TextAnchor.MiddleCenter, "ZoneLabel");
-            UIFactory.Stretch(zoneLabel.rectTransform);
 
             _totalLabel = UIFactory.Label(window.transform, "已扫描 0 件 · 合计 0", 24, UIFactory.Warn,
                                           TextAnchor.MiddleLeft, "Total");
@@ -111,12 +99,6 @@ namespace MonsterMart.UI
                                              new Color(0.30f, 0.52f, 0.34f));
             UIFactory.Anchor(_finishButton.GetComponent<RectTransform>(), new Vector2(1, 0), new Vector2(1, 0),
                              new Vector2(-160, 44), new Vector2(240, 52));
-
-            // 拖拽层：必须是窗口的最后一个子节点，否则被拖起来的商品
-            // 会被后创建的扫描区盖住（SetAsLastSibling 只在同一父节点内生效）
-            _dragLayer = UIFactory.NewRect("DragLayer", window.transform);
-            UIFactory.Stretch(_dragLayer);
-            _dragLayer.SetAsLastSibling();
         }
 
         // ------------------------------------------------------------------
@@ -133,8 +115,9 @@ namespace MonsterMart.UI
             _title.text = $"收银中 · {customer.Data.displayName}";
             _statusLabel.text = customer.WantsDiscreetBag
                 ? "顾客好像有话要说……扫完再看看"
-                : "把商品拖到右侧扫描区";
+                : "点一下商品完成扫描";
 
+            _scanLockRemaining = 0f;
             RefreshTotals();
         }
 
@@ -167,18 +150,19 @@ namespace MonsterMart.UI
             UIFactory.Anchor(label.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0),
                              new Vector2(0, 26), new Vector2(116, 46));
 
-            var drag = holder.gameObject.AddComponent<DraggableItem>();
-            drag.Setup(this, holder.rectTransform, _counter, _dragLayer);
-
             var item = new ScanItem
             {
                 product = product,
                 swallowed = swallowed,
-                widget = drag,
+                panel = holder,
                 icon = icon,
                 label = label,
             };
-            drag.item = item;
+
+            var button = holder.gameObject.AddComponent<Button>();
+            button.targetGraphic = holder;
+            button.onClick.AddListener(() => OnItemClicked(item));
+
             _items.Add(item);
         }
 
@@ -189,33 +173,49 @@ namespace MonsterMart.UI
 
             for (int i = 0; i < _items.Count; i++)
             {
-                var rt = _items[i].widget.RectTransform;
+                var rt = _items[i].panel.rectTransform;
                 rt.anchorMin = new Vector2(0.5f, 0.5f);
                 rt.anchorMax = new Vector2(0.5f, 0.5f);
                 rt.anchoredPosition = new Vector2(startX + i * spacing, 0f);
-                _items[i].widget.HomePosition = rt.anchoredPosition;
             }
         }
 
         void ClearItems()
         {
             for (int i = 0; i < _items.Count; i++)
-                if (_items[i].widget != null) Destroy(_items[i].widget.gameObject);
+                if (_items[i].panel != null) Destroy(_items[i].panel.gameObject);
             _items.Clear();
         }
 
         // ------------------------------------------------------------------
-        // 拖拽结果判定
+        // 测试专用只读入口——不用真的构造 Button 点击事件（EditMode 下也没有
+        // EventSystem 处理指针事件），直接调用和真实点击同一条逻辑。
         // ------------------------------------------------------------------
-        /// <summary>由 DraggableItem 在松手时调用。</summary>
-        public void OnItemDropped(ScanItemHandle handle, Vector2 screenPosition)
+        public int ItemCount => _items.Count;
+        public bool IsItemScanned(int index) => index >= 0 && index < _items.Count && _items[index].scanned;
+        public void ClickItem(int index)
         {
-            var item = handle.item as ScanItem;
+            if (index < 0 || index >= _items.Count) return;
+            OnItemClicked(_items[index]);
+        }
+
+        /// <summary>推进扫描间隔计时，从 Update 拆出来是为了让用例能直接推进，不用真的等一帧。</summary>
+        public void TickScanLock(float dt)
+        {
+            if (_scanLockRemaining > 0f) _scanLockRemaining -= dt;
+        }
+
+        // ------------------------------------------------------------------
+        // 扫描判定 —— 点一下就扫，不用拖到指定区域
+        // ------------------------------------------------------------------
+        void OnItemClicked(ScanItem item)
+        {
             if (item == null || _customer == null) return;
 
-            if (!InsideScanZone(screenPosition))
+            if (_scanLockRemaining > 0f)
             {
-                _scanGlow.color = new Color(0.45f, 1f, 0.55f, 0f);
+                // 收银台升级 / 收银岗位就体现在这个间隔上——见 Checkout.ScanIntervalSeconds
+                Game.Audio?.PlayError();
                 return;
             }
 
@@ -236,7 +236,8 @@ namespace MonsterMart.UI
             item.label.text = item.product.displayName + "\n<color=#7CE07C>已扫描</color>";
             Game.Audio?.PlayScan();
 
-            _scanGlow.color = new Color(0.45f, 1f, 0.55f, 0.35f);
+            // 收银台升级 / 收银岗位就体现在这个间隔上——不再是判定区大小
+            _scanLockRemaining = _checkout != null ? _checkout.ScanIntervalSeconds : 0f;
 
             // 扫到禁忌商品会有特殊对话（文档 §5.1）
             if (item.product.IsDislikedBy(_customer.Data.monsterType))
@@ -253,20 +254,6 @@ namespace MonsterMart.UI
             }
 
             RefreshTotals();
-        }
-
-        bool InsideScanZone(Vector2 screenPosition)
-        {
-            // 判定区域随收银台等级放大（文档 §5.2「扫描判定区域更大」）
-            // Canvas 是 ScreenSpaceOverlay，RectTransform.position 就是屏幕像素坐标
-            var zoneCenter = _scanZone.position;
-            var canvasScale = Root.lossyScale.x <= 0f ? 1f : Root.lossyScale.x;
-
-            float halfW = _scanZone.rect.width * 0.5f * canvasScale * _checkout.ScanWindow;
-            float halfH = _scanZone.rect.height * 0.5f * canvasScale * _checkout.ScanWindow;
-
-            return Mathf.Abs(screenPosition.x - zoneCenter.x) <= halfW &&
-                   Mathf.Abs(screenPosition.y - zoneCenter.y) <= halfH;
         }
 
         void RefreshTotals()
@@ -337,8 +324,7 @@ namespace MonsterMart.UI
                 AbortSession();
             }
 
-            _scanGlow.color = new Color(0.45f, 1f, 0.55f,
-                Mathf.Max(0f, _scanGlow.color.a - Time.deltaTime * 1.2f));
+            TickScanLock(Time.deltaTime);
         }
 
         // ------------------------------------------------------------------
@@ -528,59 +514,6 @@ namespace MonsterMart.UI
                 _checkout?.CloseSession();
                 _customer = null;
             }
-        }
-    }
-
-    /// <summary>让 DraggableItem 能把任意 payload 传回来的最小接口。</summary>
-    public class ScanItemHandle
-    {
-        public object item;
-    }
-
-    /// <summary>收银台上可拖动的商品。</summary>
-    public class DraggableItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
-    {
-        public RectTransform RectTransform { get; private set; }
-        public Vector2 HomePosition { get; set; }
-
-        internal object item;
-
-        CheckoutView _owner;
-        RectTransform _home;
-        RectTransform _dragLayer;
-        readonly ScanItemHandle _handle = new ScanItemHandle();
-
-        public void Setup(CheckoutView owner, RectTransform rt, RectTransform home, RectTransform dragLayer)
-        {
-            _owner = owner;
-            RectTransform = rt;
-            _home = home;
-            _dragLayer = dragLayer;
-        }
-
-        public void OnBeginDrag(PointerEventData e)
-        {
-            // 挪到拖拽层，这样商品会画在扫描区之上而不是被它盖住
-            if (_dragLayer != null) RectTransform.SetParent(_dragLayer, true);
-            RectTransform.SetAsLastSibling();
-        }
-
-        public void OnDrag(PointerEventData e)
-        {
-            float scale = RectTransform.lossyScale.x <= 0f ? 1f : RectTransform.lossyScale.x;
-            RectTransform.anchoredPosition += e.delta / scale;
-        }
-
-        public void OnEndDrag(PointerEventData e)
-        {
-            _handle.item = item;
-            _owner?.OnItemDropped(_handle, e.position);
-
-            // 放回台面上的原位
-            if (_home != null) RectTransform.SetParent(_home, false);
-            RectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-            RectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-            RectTransform.anchoredPosition = HomePosition;
         }
     }
 }

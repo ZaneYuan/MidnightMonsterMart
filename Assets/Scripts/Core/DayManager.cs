@@ -64,13 +64,15 @@ namespace MonsterMart.Core
 
         public void SetDay(int day)
         {
-            CurrentDay = Mathf.Clamp(day, 1, Mathf.Max(1, GameDatabase.DayCount));
-            CurrentPlan = GameDatabase.GetDay(CurrentDay);
+            // 无限连续经营：天数不再封顶在 GameDatabase.DayCount，只夹到最小值 1。
+            // 具体用哪一套 DayPlan 由 GetDayCycled 循环决定。
+            CurrentDay = Mathf.Max(1, day);
+            CurrentPlan = GameDatabase.GetDayCycled(CurrentDay);
         }
 
         public void PrepareDay()
         {
-            CurrentPlan = GameDatabase.GetDay(CurrentDay);
+            CurrentPlan = GameDatabase.GetDayCycled(CurrentDay);
             BusinessDuration = CurrentPlan != null ? CurrentPlan.businessSeconds : 200f;
             TimeRemaining = BusinessDuration;
             Notes = NightNotes.Build(CurrentPlan);
@@ -111,8 +113,6 @@ namespace MonsterMart.Core
 
         public void RecordLeftAngry(CustomerController customer) => LeftAngry++;
         public void RecordLeftUnserved(CustomerController customer) => LeftUnserved++;
-
-        public bool IsLastDay => CurrentDay >= GameDatabase.DayCount;
 
         public void AdvanceDay() => SetDay(CurrentDay + 1);
 

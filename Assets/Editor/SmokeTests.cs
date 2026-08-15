@@ -9,6 +9,7 @@ using MonsterMart.Customers;
 using MonsterMart.Data;
 using MonsterMart.Events;
 using MonsterMart.Expeditions;
+using MonsterMart.Player;
 using MonsterMart.Staff;
 using MonsterMart.Store;
 using MonsterMart.UI;
@@ -66,9 +67,14 @@ namespace MonsterMart.EditorTools
             Case("终局：通关后重进要从第一天开新局，不能重打最后一天", Test_FinishedRunStartsFreshOnReboot);
             Case("终局：没打完的存档（含旧存档）照常续玩", Test_UnfinishedRunStillResumes);
             Case("结算：普通日结算后退出重进要接着打下一天，利润不重复累计", Test_SettledDayResumesAtNextDay);
-            Case("结算：最后一天的结算不写存档，留给结局那一份", Test_LastDaySettlementKeepsPreparationSave);
+            Case("循环：三天结算后不弹结局，DayPlan 循环复用、检查员照旧每 3 天来一次", Test_DayLoopContinuesPastDayThreeWithNoForcedEnding);
             Case("重新开始：丢弃本局进度但保留图鉴等跨局数据", Test_ManualRestartDiscardsRunButKeepsCrossRunData);
             Case("暂停：收银会话冻住，不推时间、不掉耐心、不扣声望、不算愤怒离店", Test_CheckoutSessionFrozenWhilePaused);
+            Case("收银：点一下就扫描，扫描间隔真的在拦人，重复扫描有处罚", Test_CheckoutScanIsClickBasedNotPositional);
+            Case("收银：顾客还没到位时按 E 也有反馈，不是彻底没反应", Test_CheckoutGivesFeedbackWhenCustomerNotYetAtCounter);
+            Case("收银：顾客卡在排队半路走不到时，卡够久会自动吸附到排队点", Test_StuckQueueCustomerSnapsToSlot);
+            Case("货架：满了时手上正拿着同款商品也有反馈，不是彻底没反应", Test_FullShelfGivesFeedbackInsteadOfSilence);
+            Case("仓库：能把手上不要的商品放回仓库，不用被迫换成别的", Test_StockRoomCanPutBackCarriedItem);
             Case("营业：倍速只在营业中生效，且不会带出营业阶段", Test_BusinessSpeedAppliesDuringOpenOnly);
             Case("营业：倍速是跨局偏好，存能读、旧存档不会炸", Test_BusinessSpeedSurvivesSaveLoad);
             Case("目标：第二天的「撞倒货架」目标必须被判定", Test_ShelfCrashGoalIsEvaluated);
@@ -96,6 +102,8 @@ namespace MonsterMart.EditorTools
             Case("精英：护甲只挡普通攻击，技能打满（§3.4）", Test_EliteArmorOnlyBlocksBasicAttacks);
             Case("精英房：精英本体与杂兵都按房间数据刷出（§3.4）", Test_EliteRoomSpawnsGuardianAndMinions);
             Case("维拉：对精英与 Boss 额外伤害，对普通敌人没有加成（§4.2）", Test_VeraHitsElitesHarder);
+            Case("队长技能：冷却好能放，秒杀范围内敌人，放完立刻进冷却", Test_CaptainSkillOneShotsNonBossAndHasCooldown);
+            Case("队长技能：不能伤到 Boss，Boss 战还是得靠关喷口", Test_CaptainSkillSparesBoss);
             Case("Boss：喷口开着几乎打不动，全关才破防（§3.3 关闭装置）", Test_BossShieldHoldsUntilVentsClosed);
             Case("Boss：开着的喷口会持续灼伤范围内的小队（区域机制的代价）", Test_OpenVentsBurnNearbySquad);
             Case("Boss：破防是窗口不是买断，喷口会重新喷发（§3.3）", Test_VentsReopenAfterWindow);
@@ -110,6 +118,7 @@ namespace MonsterMart.EditorTools
             Case("强化「易碎品保险」：被击退保留更多但队长变慢", Test_FragileInsuranceTradesSpeedForLoot);
             Case("循环：一天从晨会走到结算，再进下一天的晨会（§2.1）", Test_DayLoopRunsMorningToNextMorning);
             Case("循环：一天只有一趟远征，去过或选了不出门都不能再去（§2.1）", Test_OnlyOneExpeditionPerDay);
+            Case("纯远征模式：跳过日夜循环，没排班也能打，打完能立刻再来一趟", Test_ExpeditionOnlyModeLoopsWithoutDayCycle);
             Case("排班：远征队最多 3 人，满员再加会被拒（§3.3）", Test_SquadCapIsEnforced);
             Case("排班：出征 + 夜班要吃两份疲劳，全休才回血（§4.4）", Test_DoubleShiftCostsMoreFatigue);
             Case("排班：疲劳越高效率越低，但不会归零（§4.4）", Test_FatigueLowersEfficiencyWithFloor);
@@ -587,40 +596,35 @@ namespace MonsterMart.EditorTools
         }
 
         /// <summary>
-        /// 最后一天的结算界面后面紧跟着结局，FinishRun 会带 runCompleted 再存一次，
-        /// 所以中间那一份没有价值 —— 而且一旦存下来，重进会带着已含最后一天利润的
-        /// 累计值重打最后一天，结算时再加一遍。这里确认它不会覆盖准备阶段那份存档，
-        /// 玩家重进后仍然是从最后一天打起、正常走到结局（不跳过结局或结算界面）。
+        /// 用户明确要求「取消三天限制，变成无限连续经营」——第三天结算后不再
+        /// 强制结局，日子按已有的三套 DayPlan 循环下去（第 4 天用第 1 天的内容，
+        /// 以此类推），检查员照旧每逢第 3 天来一次，只是不再触发 GameOver。
         /// </summary>
-        static void Test_LastDaySettlementKeepsPreparationSave()
+        static void Test_DayLoopContinuesPastDayThreeWithNoForcedEnding() => WithIsolatedSaveFile(() =>
         {
-            WithIsolatedSaveFile(() =>
+            Game.Manager.ResetRunState(1, 0);
+            Game.Manager.BeginNewDay();
+
+            for (int day = 1; day <= 5; day++)
             {
-                // 第三天准备阶段，前两天累计 80
-                Game.Manager.ResetRunState(3, 80);
-                Game.Day.PrepareDay();
-                SaveSystem.Save();
+                IsTrue(Game.Day.CurrentPlan != null, $"第 {day} 天没有对应的 DayPlan —— 循环断了");
 
-                var before = SaveSystem.Load();
-                IsTrue(before != null, "准备阶段存档没读回来");
-                IsTrue(!before.daySettled, "准备阶段存档不该标记已结算");
-                AreEqual(80, before.totalProfit, "准备阶段存档里的累计利润");
+                bool expectInspector = day % 3 == 0;
+                if (expectInspector)
+                    IsTrue(Game.Day.CurrentPlan.spawnInspector, $"第 {day} 天该有检查员却没有");
+                else
+                    IsTrue(!Game.Day.CurrentPlan.spawnInspector, $"第 {day} 天不该有检查员却来了");
 
-                // 打完第三天
-                Game.Economy.RecordSale(70);
-                Game.Economy.RecordCostOfGoodsSold(20);
+                Game.Manager.OpenStore();
                 Game.Manager.ConcludeDay();
-                AreEqual(130, Game.Manager.TotalProfit, "结算后的累计利润");
+                Game.Manager.ContinueAfterSettlement();
 
-                var after = SaveSystem.Load();
-                IsTrue(after != null, "存档不该消失");
-                IsTrue(!after.daySettled, "最后一天的结算不该写 daySettled");
-                AreEqual(80, after.totalProfit,
-                         "最后一天的结算覆盖了存档 —— 重进会重打第三天并重复累计利润");
-                AreEqual(3, SaveSystem.ResumeDay(after),
-                         "最后一天应该仍从第三天打起，正常走到结局");
-            });
-        }
+                AreEqual((int)GameState.MorningBrief, (int)Game.Manager.State,
+                    $"第 {day} 天结算后应该直接进下一天的晨会，而不是弹结局（无限连续经营）");
+            }
+
+            AreEqual(6, Game.Day.CurrentDay, "跑完 5 天结算后应该停在第 6 天");
+        });
 
         /// <summary>
         /// 回归用例。
@@ -1789,6 +1793,60 @@ namespace MonsterMart.EditorTools
         });
 
         /// <summary>
+        /// 用户反馈明确要求「队长也能打，不需要站在那里不动」——手动技能、有冷却、
+        /// 不吃 MP，伤害高到直接秒杀范围内的敌人。
+        /// </summary>
+        static void Test_CaptainSkillOneShotsNonBossAndHasCooldown() => WithIsolatedSaveFile(() =>
+        {
+            Game.Expedition.Begin();
+            try
+            {
+                AdvanceToRoom(RoomKind.Resource);
+
+                var captain = Game.Expedition.Captain;
+                var enemy = FirstAliveEnemy();
+                IsTrue(enemy != null, "资源房应该有一只普通敌人");
+
+                captain.TeleportTo(enemy.Cell);
+                IsTrue(captain.SkillReady, "前置条件：技能一开始应该没有冷却");
+
+                IsTrue(captain.TryUseSkill(), "冷却好的时候应该能放技能");
+                IsTrue(!enemy.IsAlive, "范围内的敌人应该被秒杀");
+                IsTrue(!captain.SkillReady, "放完技能应该立刻进入冷却");
+                IsTrue(!captain.TryUseSkill(), "冷却没到还能再放一次");
+            }
+            finally
+            {
+                if (Game.Expedition.IsRunning) Game.Expedition.Finish(ExpeditionOutcome.Retreated);
+            }
+        });
+
+        /// <summary>Boss 战还是得靠关喷口——队长这个大招不能绕过区域机制直接秒了 Boss。</summary>
+        static void Test_CaptainSkillSparesBoss() => WithIsolatedSaveFile(() =>
+        {
+            Game.Expedition.Begin();
+            try
+            {
+                AdvanceToRoom(RoomKind.Boss);
+
+                var captain = Game.Expedition.Captain;
+                var boss = Game.Expedition.Boss;
+                IsTrue(boss != null, "Boss 房里没有 Boss");
+
+                captain.TeleportTo(boss.Cell);
+                float hpBefore = boss.Health.Current;
+
+                IsTrue(captain.TryUseSkill(), "冷却好的时候应该能放技能");
+                AreEqualFloat(hpBefore, boss.Health.Current,
+                              "队长技能不该伤到 Boss —— Boss 战还是得靠关喷口，不能被这个技能绕过去");
+            }
+            finally
+            {
+                if (Game.Expedition.IsRunning) Game.Expedition.Finish(ExpeditionOutcome.Retreated);
+            }
+        });
+
+        /// <summary>
         /// §3.3 要求「Boss 通过区域机制、护送商品或<b>关闭装置</b>制造变化」。
         /// 孢子巨兽选的是关闭装置：喷口全开时它几乎无敌，队长必须跑一圈把喷口关掉。
         /// </summary>
@@ -2405,6 +2463,37 @@ namespace MonsterMart.EditorTools
             AreEqual(0, StaffRoster.SquadSize, "前置条件：应该没人出征");
             IsTrue(!Game.Manager.StartDayExpedition(), "没派人也能出发");
             IsTrue(!Game.Manager.ExpeditionDoneToday, "没出成的远征不该算用掉");
+        });
+
+        /// <summary>
+        /// 用户明确要求「给远征模式开一个单独的入口，不需要白天打怪晚上看店，
+        /// 可以纯一直打怪通关」——不用先走晨会排班，没排班也能用默认队伍打，
+        /// 打完一趟能立刻再来一趟，不受「一天一趟远征」的限制。
+        /// </summary>
+        static void Test_ExpeditionOnlyModeLoopsWithoutDayCycle() => WithIsolatedSaveFile(() =>
+        {
+            Game.Manager.ResetRunState(1, 0);
+            // 故意不走 BeginNewDay/晨会排班，模拟「直接从暂停菜单进纯远征模式」
+
+            Game.Manager.EnterExpeditionOnlyMode();
+            IsTrue(Game.Manager.ExpeditionOnlyMode, "没有进入纯远征模式");
+            IsTrue(Game.Expedition.IsRunning, "没有排班也该用默认队伍打起来");
+            AreEqual(GameDatabase.DefaultSquad.Length, Game.Expedition.Squad.Count, "默认队伍人数不对");
+
+            Game.Expedition.Finish(ExpeditionOutcome.Retreated);
+            IsTrue(!Game.Expedition.IsRunning, "第一趟应该已经结束");
+            IsTrue(Game.Manager.ExpeditionOnlyMode, "打完一趟不该自动退出纯远征模式");
+            AreEqual((int)GameState.Expedition, (int)Game.Manager.State,
+                     "纯远征模式打完一趟不该被送进闭店准备");
+
+            // 不受「一天一趟」限制，立刻能再来一趟
+            Game.Manager.StartAnotherLoopedExpedition();
+            IsTrue(Game.Expedition.IsRunning, "打完一趟之后应该能立刻再来一趟");
+
+            Game.Manager.ExitExpeditionOnlyMode();
+            IsTrue(!Game.Manager.ExpeditionOnlyMode, "退出之后模式标记没清掉");
+            IsTrue(!Game.Expedition.IsRunning, "退出纯远征模式应该把还在跑的远征收掉");
+            AreEqual((int)GameState.Preparation, (int)Game.Manager.State, "退出后应该落回闭店准备");
         });
 
         static void Test_SquadCapIsEnforced()
@@ -3042,6 +3131,16 @@ namespace MonsterMart.EditorTools
                 ui.ToggleBestiary();
                 ui.ToggleBestiary();
 
+                // 暂停菜单：还没进纯远征模式时按钮文案应该是入口文案
+                // （模式切换本身连带的存档副作用，交给下面 WithIsolatedSaveFile
+                // 包着的 Test_ExpeditionOnlyModeLoopsWithoutDayCycle 去测，这里
+                // 只确认面板搭得起来、默认文案不对）
+                ui.ShowPauseMenu();
+                IsTrue(ui.Pause.IsOpen, "暂停菜单打不开");
+                IsTrue(ui.Pause.ExpeditionModeLabelText.Contains("纯远征"),
+                       "还没进纯远征模式时按钮文案不对");
+                ui.ClosePauseMenu();
+
                 ui.ShowChoice("测试", "测试正文",
                               new ChoiceOption("确定", "", () => { }));
                 IsTrue(ui.Choice.IsOpen, "选择弹窗打不开");
@@ -3113,6 +3212,178 @@ namespace MonsterMart.EditorTools
                 Game.UI = null;
                 UnityEngine.Object.DestroyImmediate(uiGo);
             }
+        }
+
+        /// <summary>
+        /// 用户反馈明确要求「直接点击一件结账，不需要一个个拖到扫描区域」——
+        /// 扫描现在是点一下就成功，不需要任何拖拽/位置判定。收银台升级 / 收银岗位
+        /// 的加成挪到了「两次扫描之间的间隔」上，得验证这个间隔真的在拦人，
+        /// 而不是形同虚设。
+        /// </summary>
+        static void Test_CheckoutScanIsClickBasedNotPositional()
+        {
+            var uiGo = new GameObject("UIRootSandbox_Checkout");
+            uiGo.hideFlags = HideFlags.HideAndDontSave;
+
+            try
+            {
+                var ui = uiGo.AddComponent<UIRoot>();
+                ui.Build();
+                Game.UI = ui;
+
+                var jelly = GameDatabase.GetProduct("glow_jelly");
+                IsTrue(jelly != null, "前置条件：找不到测试用商品 glow_jelly");
+
+                var customer = SpawnCustomer(MonsterType.Slime);
+                customer.Basket.Add(jelly);
+                customer.Basket.Add(jelly);
+
+                var checkout = Game.Store.Checkout;
+                ui.ShowCheckout(checkout, customer);
+
+                IsTrue(ui.CheckoutPanel.IsOpen, "收银界面打不开");
+                AreEqual(2, ui.CheckoutPanel.ItemCount, "台面上的商品数量不对");
+                IsTrue(!ui.CheckoutPanel.IsItemScanned(0), "前置条件：还没点就已经算扫描过了");
+
+                // 点一下就扫，不需要任何拖拽/位置判定
+                ui.CheckoutPanel.ClickItem(0);
+                IsTrue(ui.CheckoutPanel.IsItemScanned(0), "点一下商品应该直接扫描成功");
+
+                // 扫描间隔还没过：紧接着点下一件应该被挡住，否则收银台升级就没有意义了
+                ui.CheckoutPanel.ClickItem(1);
+                IsTrue(!ui.CheckoutPanel.IsItemScanned(1), "扫描间隔还没到就能扫下一件");
+
+                // 间隔过去之后应该能正常扫
+                ui.CheckoutPanel.TickScanLock(999f);
+                ui.CheckoutPanel.ClickItem(1);
+                IsTrue(ui.CheckoutPanel.IsItemScanned(1), "间隔过了却还是扫不了");
+
+                // 重复点已经扫过的商品要有处罚（间隔过去之后才轮到这条判定）
+                ui.CheckoutPanel.TickScanLock(999f);
+                int repBefore = Game.Reputation.Value;
+                ui.CheckoutPanel.ClickItem(0);
+                AreEqual(repBefore + GameConfig.RepScanError, Game.Reputation.Value, "重复扫描没有扣声望");
+
+                ui.CloseCheckout();
+                IsTrue(!ui.CheckoutPanel.IsOpen, "收银界面关不掉");
+            }
+            finally
+            {
+                Game.UI = null;
+                UnityEngine.Object.DestroyImmediate(uiGo);
+            }
+        }
+
+        /// <summary>
+        /// 用户反馈「靠近了结算台按 E 没反应，没办法给客人结算」——队首顾客还在
+        /// 走向排队点的那一瞬间，以前 IsAvailable 直接判 false，玩家按 E 像按了空气。
+        /// 现在这种情况下也该算「可交互」，只是提示告诉玩家等一下。
+        /// </summary>
+        static void Test_CheckoutGivesFeedbackWhenCustomerNotYetAtCounter() => WithIsolatedSaveFile(() =>
+        {
+            EnterDay(2);
+            Game.Manager.OpenStore();
+
+            var checkout = Game.Store.Checkout;
+            var customer = SpawnCustomer(MonsterType.Vampire);
+            checkout.Enqueue(customer);
+
+            // 沙盒里没搭 PlayerController（BuildSandbox 只建了 Managers/Store/Spawner），
+            // 但 Checkout.IsAvailable/GetPrompt/OnInteract 都不读这个参数，传 null 一样能测
+            IsTrue(!checkout.HeadReady, "前置条件：顾客不该已经站定");
+            IsTrue(checkout.IsAvailable(null),
+                   "队里有人但还没走到，收银台应该还算「可交互」，只是给个提示，而不是彻底不可用");
+            IsTrue(!string.IsNullOrEmpty(checkout.GetPrompt(null)),
+                   "顾客还没到位时也该有提示文案，不能是空气");
+
+            checkout.OnInteract(null);
+            IsTrue(!checkout.SessionOpen, "顾客还没到位，收银会话却被打开了");
+        });
+
+        /// <summary>
+        /// 用户反馈明确描述为「卡bug了」——货架满了、玩家手上正好拿着这个商品时，
+        /// 以前 IsAvailable 直接判 false，按 E 像按了空气，人也没法腾出手接下一件。
+        /// 现在这种情况也该算「可交互」，只是给个「满了」的提示。
+        /// </summary>
+        static void Test_FullShelfGivesFeedbackInsteadOfSilence()
+        {
+            var jelly = GameDatabase.GetProduct("glow_jelly");
+            var shelf = Game.Store.FindShelf(jelly);
+            IsTrue(shelf != null, "前置条件：找不到发光果冻的货架");
+
+            shelf.count = shelf.capacity;   // 货架装满
+            shelf.Refresh();
+
+            var player = SpawnPlayer();
+            Game.Store.AddToWarehouse(jelly, 3);
+            player.TakeFromWarehouse(jelly);
+            AreEqual(3, player.Carry.Count, "前置条件：玩家手上应该有 3 件");
+
+            IsTrue(shelf.IsAvailable(player), "货架满了却判成不可交互——按 E 会像按了空气");
+            IsTrue(shelf.GetPrompt(player).Contains("满"), "满货架的提示文案不对");
+
+            int before = shelf.count;
+            shelf.OnInteract(player);
+            AreEqual(before, shelf.count, "满货架不该继续往上叠货");
+            AreEqual(3, player.Carry.Count, "满货架不该把玩家手上的货凭空吃掉");
+        }
+
+        /// <summary>
+        /// 用户明确要求「应该能把手上的东西放回仓库，而不是只能切换商品」——
+        /// 以前唯一「腾空手」的办法是去仓库点一个有库存的其他商品，顺带把手上的
+        /// 换掉；货架满了没处卸、又不想拿件不需要的东西时会被卡住。
+        /// </summary>
+        static void Test_StockRoomCanPutBackCarriedItem()
+        {
+            var uiGo = new GameObject("UIRootSandbox_StockRoom");
+            uiGo.hideFlags = HideFlags.HideAndDontSave;
+
+            try
+            {
+                var ui = uiGo.AddComponent<UIRoot>();
+                ui.Build();
+                Game.UI = ui;
+
+                var player = SpawnPlayer();
+                var jelly = GameDatabase.GetProduct("glow_jelly");
+                Game.Store.AddToWarehouse(jelly, 5);
+                player.TakeFromWarehouse(jelly);
+                AreEqual(5, player.Carry.Count, "前置条件：手上应该有货");
+
+                int warehouseBefore = Game.Store.WarehouseCount(jelly);
+
+                ui.ShowStockRoom();
+                IsTrue(ui.StockRoomPicker.IsOpen, "仓库界面打不开");
+
+                ui.StockRoomPicker.PutBackCarry();
+                IsTrue(player.Carry.IsEmpty, "点了放回仓库，手上还有东西");
+                AreEqual(warehouseBefore + 5, Game.Store.WarehouseCount(jelly), "放回仓库的数量不对");
+            }
+            finally
+            {
+                Game.UI = null;
+                UnityEngine.Object.DestroyImmediate(uiGo);
+            }
+        }
+
+        /// <summary>
+        /// 用户反馈「有时候人走到收银机旁按 E 也结不了账」——顾客卡在半路走不到
+        /// 排队点（寻路偶尔失败之类）时，以前会永远卡着，HeadReady 永远是
+        /// false。卡够久应该直接吸附到排队点，不能让玩家干等。
+        /// </summary>
+        static void Test_StuckQueueCustomerSnapsToSlot()
+        {
+            var vampire = SpawnCustomer(MonsterType.Vampire);
+            Game.Store.Checkout.Enqueue(vampire);
+
+            IsTrue(!vampire.IsAtQueueSlot, "前置条件：刚入队不该已经站定");
+
+            // 模拟顾客卡在半路走不到（现实里对应寻路偶尔失败）——只推进
+            // TickWaitingInQueue，不真的移动
+            for (int i = 0; i < 10; i++)
+                vampire.TickWaitingInQueue(0.3f);   // 10 × 0.3 = 3s，超过 QueueStuckSeconds(2s)
+
+            IsTrue(vampire.IsAtQueueSlot, "卡够久之后应该自动吸附到排队点，不能让顾客卡死");
         }
 
         static EnemyController FirstEnemyOfTier(EnemyTier tier)
@@ -3369,6 +3640,22 @@ namespace MonsterMart.EditorTools
             var inspector = SpawnCustomer(MonsterType.Inspector);
             IsTrue(!inspector.Served, "前置条件不成立：检查员不该已经结过账");
             return inspector;
+        }
+
+        /// <summary>
+        /// BuildSandbox 不建 PlayerController（默认沙盒不需要）——需要真的测
+        /// PlayerCarry 相关交互时（货架/仓库）现建一个，挂在 Store 同一个父节点下，
+        /// 这样 TeardownSandbox 销毁沙盒根节点时会一并清掉。
+        /// </summary>
+        static PlayerController SpawnPlayer()
+        {
+            var go = new GameObject("TestPlayer");
+            if (Game.Store != null) go.transform.SetParent(Game.Store.transform.parent, false);
+
+            var player = go.AddComponent<PlayerController>();
+            player.Initialize(Game.Store.PlayerStartCell);
+            Game.Player = player;
+            return player;
         }
 
         // ------------------------------------------------------------------

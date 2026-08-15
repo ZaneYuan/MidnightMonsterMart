@@ -81,7 +81,7 @@ namespace MonsterMart.UI
 
             // ---- 底部：操作提示 + 撤退 + 队员信息 ----
             var hint = UIFactory.Label(Root,
-                "WASD 移动 · E 采集 · 数字键 1~3 放技能 · Q 标记目标 · R 撤退 · Tab 队员信息",
+                "WASD 移动 · E 采集 · 数字键 1~3 放技能 · 空格 队长技能 · Q 标记目标 · R 撤退 · Tab 队员信息",
                 20, UIFactory.InkDim, TextAnchor.MiddleCenter, "Hint");
             UIFactory.Anchor(hint.rectTransform, new Vector2(0.5f, 0), new Vector2(0.5f, 0),
                              new Vector2(0, 62), new Vector2(1200, 34));
@@ -165,11 +165,19 @@ namespace MonsterMart.UI
             if (expedition.Captain != null && rowIndex < _rows.Count)
             {
                 var row = _rows[rowIndex++];
-                float hp = expedition.Captain.Health != null ? expedition.Captain.Health.Normalized : 0f;
+                var captain = expedition.Captain;
+                float hp = captain.Health != null ? captain.Health.Normalized : 0f;
+
+                float cd = captain.SkillReady ? 1f
+                    : 1f - Mathf.Clamp01(captain.SkillCooldownRemaining / ExpeditionCaptain.SkillCooldown);
+
                 row.label.text = $"队长　<color=#C8A8F0>Lv.{CaptainProgress.Level}</color>　" +
-                                  $"{Mathf.CeilToInt(hp * ExpeditionCaptainMaxHealth)} HP";
+                                  $"{Mathf.CeilToInt(hp * ExpeditionCaptainMaxHealth)} HP　" +
+                                  (captain.SkillReady
+                                      ? "<color=#8FE3C0>技能(空格)就绪</color>"
+                                      : $"技能 {captain.SkillCooldownRemaining:0.0}s");
                 row.healthFill.fillAmount = hp;
-                row.cooldownFill.fillAmount = 0f;
+                row.cooldownFill.fillAmount = cd;
             }
 
             var squad = expedition.Squad;

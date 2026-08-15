@@ -130,6 +130,9 @@ namespace MonsterMart.Core
         /// <summary>Q：目标标记 — 设计文档 §3.2「目标标记：优先攻击指定敌人」。</summary>
         public static bool MarkTargetPressed => Input.GetKeyDown(KeyCode.Q);
 
+        /// <summary>空格：队长手动技能 —— 用户反馈明确要求「队长也能打，手动放、有冷却」。</summary>
+        public static bool CaptainSkillPressed => Input.GetKeyDown(KeyCode.Space);
+
         /// <summary>数字键 1/2/3 —— 事件弹窗的快捷选择。</summary>
         public static int ChoiceHotkey
         {

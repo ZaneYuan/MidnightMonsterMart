@@ -65,6 +65,9 @@ namespace MonsterMart.Customers
         public bool IsWaitingAtCheckout =>
             State == CustomerState.WaitingInQueue && _atQueueSlot && Game.Store.Checkout.IndexOf(this) == 0;
 
+        /// <summary>排队时是不是已经走到自己的位置站定了——回归用例读这个。</summary>
+        public bool IsAtQueueSlot => _atQueueSlot;
+
         // ---- 内部状态 ----
         SpriteRenderer _sprite;
         readonly List<Vector2Int> _path = new List<Vector2Int>();
@@ -185,7 +188,7 @@ namespace MonsterMart.Customers
                 case CustomerState.MovingToShelf: TickMovingToShelf(); break;
                 case CustomerState.TakingProduct: TickTakingProduct(dt); break;
                 case CustomerState.MovingToCheckout: TickMovingToCheckout(); break;
-                case CustomerState.WaitingInQueue: TickWaitingInQueue(); break;
+                case CustomerState.WaitingInQueue: TickWaitingInQueue(dt); break;
                 case CustomerState.CheckingOut: break;   // 由 CheckoutView 驱动
                 case CustomerState.SpecialEvent: TickSpecialEvent(); break;
                 case CustomerState.Leaving: TickLeaving(); break;
@@ -434,7 +437,17 @@ namespace MonsterMart.Customers
             }
         }
 
-        void TickWaitingInQueue()
+        /// <summary>连续这么久几乎没挪动就判定卡在半路走不到排队点，直接吸附过去。</summary>
+        const float QueueStuckSeconds = 2f;
+        const float QueueStuckEpsilonSqr = 0.0004f;
+
+        float _queueStuckTimer;
+        Vector2 _lastQueuePosition;
+
+        /// <summary>
+        /// 从 Update 拆出 dt 参数是为了让无头用例能直接推进（可测试性抽取模式）。
+        /// </summary>
+        public void TickWaitingInQueue(float dt)
         {
             // 前面的人走了就往前挪
             int index = Game.Store.Checkout.IndexOf(this);
@@ -448,11 +461,35 @@ namespace MonsterMart.Customers
             if ((slot - _position).sqrMagnitude > 0.09f)
             {
                 _atQueueSlot = false;
+
+                // 寻路偶尔会失败（目标格暂时不可达之类），顾客会卡在半路原地
+                // 反复重算却走不到——排队点永远到不了，HeadReady 也永远是
+                // false，玩家站在收银台前按 E 就跟按了空气一样。这里给一个
+                // 兜底：卡够久直接吸附到排队点，和 StaffFollower.Unstick
+                // 是同一套思路。
+                if ((_position - _lastQueuePosition).sqrMagnitude < QueueStuckEpsilonSqr)
+                    _queueStuckTimer += dt;
+                else
+                    _queueStuckTimer = 0f;
+                _lastQueuePosition = _position;
+
+                if (_queueStuckTimer >= QueueStuckSeconds)
+                {
+                    _position = slot;
+                    transform.position = _position;
+                    _path.Clear();
+                    _pathIndex = 0;
+                    _queueStuckTimer = 0f;
+                    _atQueueSlot = true;
+                    return;
+                }
+
                 SetDestination(StoreGrid.WorldToCell(slot));
             }
             else if (_path.Count == 0)
             {
                 _atQueueSlot = true;
+                _queueStuckTimer = 0f;
             }
         }
 

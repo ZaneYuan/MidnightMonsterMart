@@ -347,7 +347,9 @@ namespace MonsterMart.UI
 
             if (plan != null)
             {
-                _title.text = plan.title;
+                // plan.title 只是主题词（不带「第 N 天」）——天数循环复用同一套
+                // DayPlan 之后，前缀得从当前真实天数现拼，不能烧在数据里
+                _title.text = $"第 {Game.Day.CurrentDay} 天 · {plan.title}";
                 _briefing.text = plan.briefing;
                 _goalLabel.text = "今晚目标：" + plan.goalDescription;
             }
@@ -473,7 +475,7 @@ namespace MonsterMart.UI
             }
 
             checkout.SetLevel(1);
-            Game.UI.Hud.Flash("收银台已升级：扫描判定更大，排队掉耐心更慢");
+            Game.UI.Hud.Flash("收银台已升级：扫描更快，排队掉耐心更慢");
             Game.Audio?.PlayUiClick();
             RefreshAll();
         }
@@ -576,6 +578,7 @@ namespace MonsterMart.UI
     {
         Transform _list;
         readonly List<Row> _rows = new List<Row>();
+        Button _putBackButton;
 
         class Row
         {
@@ -621,7 +624,15 @@ namespace MonsterMart.UI
 
             var close = UIFactory.Button(window.transform, "关闭 (Esc)", Close, 20);
             UIFactory.Anchor(close.GetComponent<RectTransform>(), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                             new Vector2(0, 46), new Vector2(220, 50));
+                             new Vector2(130, 46), new Vector2(220, 50));
+
+            // 用户反馈明确要求「应该能把手上的东西放回仓库，而不是只能切换商品」——
+            // 以前唯一「腾空手」的办法是点一个有库存的其他商品，把手上的顺带换掉，
+            // 货架满了没处卸、又不想随手拿件不需要的东西时会被卡住。
+            _putBackButton = UIFactory.Button(window.transform, "放回仓库", PutBackCarry, 20,
+                                              new Color(0.42f, 0.30f, 0.22f));
+            UIFactory.Anchor(_putBackButton.GetComponent<RectTransform>(), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                             new Vector2(-130, 46), new Vector2(220, 50));
 
             BuildRows();
         }
@@ -662,6 +673,10 @@ namespace MonsterMart.UI
                 row.button.interactable = available > 0;
                 row.label.color = available > 0 ? UIFactory.Ink : UIFactory.InkDim;
             }
+
+            var carry = Game.Player != null ? Game.Player.Carry : null;
+            bool holding = carry != null && !carry.IsEmpty;
+            _putBackButton.interactable = holding;
         }
 
         void Pick(ProductData product)
@@ -678,6 +693,26 @@ namespace MonsterMart.UI
 
             Game.UI.Hud.Flash($"拿起 {product.displayName} ×{taken}");
             Close();
+        }
+
+        /// <summary>
+        /// 手上的东西不想要了（比如目标货架满了、又不想顺手拿件别的）——
+        /// 直接放回仓库，腾出手来。公开出来给按钮和回归用例共用。
+        /// </summary>
+        public void PutBackCarry()
+        {
+            var carry = Game.Player != null ? Game.Player.Carry : null;
+            if (carry == null || carry.IsEmpty)
+            {
+                Game.UI.Hud.Flash("手上没有东西");
+                return;
+            }
+
+            Game.Store.AddToWarehouse(carry.Product, carry.Count);
+            Game.UI.Hud.Flash($"{carry.Product.displayName} ×{carry.Count} 放回仓库");
+            carry.Clear();
+            Game.Audio?.PlayUiClick();
+            Refresh();
         }
     }
 }

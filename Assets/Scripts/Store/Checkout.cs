@@ -35,10 +35,16 @@ namespace MonsterMart.Store
         public static float CashierEfficiency =>
             StaffRoster.EfficiencyOn(StaffAssignment.Cashier);
 
-        /// <summary>扫描判定区。收银台等级决定基线，收银岗的员工在此之上加宽。</summary>
+        /// <summary>扫描熟练度。收银台等级决定基线，收银岗的员工在此之上加宽。</summary>
         public float ScanWindow =>
             (Level >= 1 ? GameConfig.ScanUpgradedWindow : GameConfig.ScanBaseWindow) *
             (1f + GameConfig.CashierScanBonus * CashierEfficiency);
+
+        /// <summary>
+        /// 点一次扫描之后，多久能扫下一件 —— 收银台升级 / 收银岗位的加成
+        /// 就体现在这个间隔上（越熟练间隔越短），不再是判定区大小。
+        /// </summary>
+        public float ScanIntervalSeconds => GameConfig.ScanClickDelay / Mathf.Max(0.4f, ScanWindow);
 
         /// <summary>排队额外掉耐心的倍率。排了收银岗就有人分担，队伍没那么焦躁。</summary>
         public float QueuePatienceMultiplier =>
@@ -129,14 +135,27 @@ namespace MonsterMart.Store
         {
             if (Game.Manager == null || Game.Manager.State != GameState.Open) return false;
             if (SessionOpen) return false;
-            return HeadReady;
+
+            // 队首已经站定就能开始；队里有人但还在走过来时也算「可交互」——
+            // 只是按 E 会告诉玩家再等一下，而不是像空气一样毫无反应
+            // （靠近了按 E 没反应，之前被当成 bug 反馈过）。
+            return HeadReady || QueueLength > 0;
         }
 
         public override string GetPrompt(PlayerController player)
-            => $"[E] 开始结账（队伍 {QueueLength} 人）";
+            => HeadReady
+                ? $"[E] 开始结账（队伍 {QueueLength} 人）"
+                : "顾客还在往这边走……";
 
         public override void OnInteract(PlayerController player)
         {
+            if (!HeadReady)
+            {
+                Game.UI?.Hud?.Flash("顾客还没走到收银台前，等它站定");
+                Game.Audio?.PlayError();
+                return;
+            }
+
             var head = Head;
             if (head == null) return;
 

@@ -53,8 +53,12 @@ namespace MonsterMart.Data
         public const float BrowseSeconds = 1.1f;
 
         // ---------- 收银（设计文档 §5） ----------
-        public const float ScanBaseWindow = 1.0f;       // 初级收银台扫描判定区宽度
-        public const float ScanUpgradedWindow = 1.7f;   // 升级后判定更大
+        // 用户反馈明确要求「点一下就结账，不用一个个拖到扫描区域」——扫描从
+        // 「拖到判定区」的空间技巧改成「点一下」，ScanBaseWindow/ScanUpgradedWindow
+        // 不再决定判定区大小，改成决定两次扫描之间的间隔有多短（见 ScanClickDelay）。
+        public const float ScanBaseWindow = 1.0f;       // 初级收银台扫描间隔基线
+        public const float ScanUpgradedWindow = 1.7f;   // 升级后间隔更短
+        public const float ScanClickDelay = 0.35f;      // 两次扫描之间的基础间隔（秒），除以 ScanWindow
         public const int CheckoutUpgradeCost = 100;     // 文档明确 100 金币
         public const float QueuePatiencePenaltyPerSecond = 0.9f;
         public const float UpgradedQueuePatienceMultiplier = 0.6f;
